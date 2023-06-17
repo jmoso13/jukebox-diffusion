@@ -369,7 +369,7 @@ class DemoCallback(pl.Callback):
                 # Include conditioned and noisy audio in the demo
                 x_a, _, n_x = batch_postprocess(x_q, module.vqvae, module.level)
                 cond_a, _, n_c =  batch_postprocess(cond_q, module.vqvae, module.level)
-                full_fakes[:, :, :self.base_samples*6] += t.cat([cond_a, x_a, x_noise_audio, cond_a], dim = 2)
+                full_fakes[:, :, :self.base_samples*6] += t.cat([cond_a, x_a, rearrange(x_noise_audio[:self.num_demos], "b t c -> b c t"), cond_a], dim = 2)
                 # Diffuse
                 fakes = module.diffusion.sample(
                         noise.float(),
