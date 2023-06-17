@@ -288,6 +288,7 @@ class JBDiffusion(pl.LightningModule):
             _, x_noise_q = batch_preprocess(x, self.vqvae, self.level+1)
             x_noise_audio, _, _ = batch_postprocess(x_noise_q, self.vqvae, self.level+1)
             # Preprocess and encode noisy audio at current level
+            print(x_noise_audio.shape)
             _, x_noise = batch_preprocess(x_noise_audio, self.vqvae, self.level)
             with t.cuda.amp.autocast():
                 # Step
