@@ -71,7 +71,7 @@ def run(*args, **kwargs):
 
   # Instantiate model
   diffusion_model = JBDiffusion(vqvae=vqvae, level=level, diffusion_kwargs=diffusion_conf)
-  print(diffusion_model)
+  print(diffusion_model.diffusion)
 
   # Call trainer with WandB logging
   if log_to_wandb:

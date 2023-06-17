@@ -203,7 +203,11 @@ def batch_preprocess(x, vqvae, level):
     '''
     Takes audio and preprocesses it for use in diffusion
     '''
-    hps = dict(aug_blend=False, channels=2)
+    class tmp_hps:
+        def __init__(self):
+            self.aug_blend=False
+            self.channels=2
+    hps = tmp_hps()
     x = audio_preprocess(x, hps)
     x = vqvae.preprocess(x)
     z_q, x_q = vqvae.bottleneck.level_blocks[level](vqvae.encoders[level](x)[-1], update_k=False)[:2]
