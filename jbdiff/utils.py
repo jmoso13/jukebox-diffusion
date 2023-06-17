@@ -1,6 +1,5 @@
 import jukebox
 import torch as t
-import torch.nn as nn
 import librosa
 import os
 import numpy as np
@@ -247,6 +246,15 @@ def ema_update(model, averaged_model, decay):
 
 
 class JBDiffusion(pl.LightningModule):
+    '''
+    JBDiffusion class to be trained
+
+    Init Params
+    ___________
+    - vqvae: (Jukebox) instance of the vqvae encoder/decoder for retrieving latent codes
+    - level: (int) level of vqvae latent codes to train on (2->0)
+    - diffusion_kwargs: (dict) dict of diffusion kwargs
+    '''
     def __init__(self, vqvae, level, diffusion_kwargs):
         super().__init__()
 
@@ -261,20 +269,28 @@ class JBDiffusion(pl.LightningModule):
         return t.optim.Adam([*self.diffusion.parameters()], lr=4e-5)
 
     def training_step(self, batch, batch_idx):
+        # Assure training
         self.diffusion.train()
         assert self.diffusion.training
+        # Grab train batch
         x, cond = batch
+        # Preprocess batch and conditional audio for diffusion (includes running batch through Jukebox encoder)
         z_q, x_q = batch_preprocess(x, self.vqvae, self.level)
         cond_z, cond_q = batch_preprocess(cond, self.vqvae, self.level)
         cond_q = rearrange(cond_q, "b c t -> b t c")
+        # Upsampler uses noisy data from level below
         if self.upsampler:
+            # Run example through level below back to noisy audio
             _, x_noise_q = batch_preprocess(x, self.vqvae, self.level+1)
             x_noise_audio, _, _ = batch_postprocess(x_noise_q, self.vqvae, self.level+1)
+            # Preprocess and encode noisy audio at current level
             _, x_noise = batch_preprocess(x_noise_audio, self.vqvae, self.level)
             with t.cuda.amp.autocast():
+                # Step
                 loss = self.diffusion(x_q, noise=x_noise, embedding=cond_q, embedding_mask_proba=0.1)
         else:
             with t.cuda.amp.autocast():
+                # Step
                 loss = self.diffusion(x_q, embedding=cond_q, embedding_mask_proba=0.1)
 
         log_dict = {
@@ -295,6 +311,13 @@ class ExceptionCallback(pl.Callback):
 
 
 class DemoCallback(pl.Callback):
+    '''
+    Class for demoing during training
+
+    Init Params
+    ____________
+    - global_args: (DemoArgs class) kwargs for demoing
+    '''
     def __init__(self, global_args):
         super().__init__()
         self.demo_every = global_args.demo_every
@@ -315,11 +338,13 @@ class DemoCallback(pl.Callback):
 
         if (trainer.global_step - 1) % self.demo_every != 0 or self.last_demo_step == trainer.global_step:
             return
-    
+        
+        # Assert eval mode
         module.diffusion.eval()
         assert not module.diffusion.training
         self.last_demo_step = trainer.global_step
 
+        # Grab batch and process
         x, cond = batch
         z_q, x_q = batch_preprocess(x, module.vqvae, module.level)
         z_cond, cond_q = batch_preprocess(cond, module.vqvae, module.level)
@@ -328,29 +353,39 @@ class DemoCallback(pl.Callback):
         embedding = rearrange(cond_q, "b c t -> b t c")
         try:
             if module.upsampler:
+                # If upsampler run audio through the lower level to extract noisy audio
                 _, x_noise_q = batch_preprocess(x, module.vqvae, module.level+1)
                 x_noise_audio, _, _ = batch_postprocess(x_noise_q, module.vqvae, module.level+1)
                 _, noise = batch_preprocess(x_noise_audio, module.vqvae, module.level)
                 noise = noise[:self.num_demos]
+                # Full audio container
                 full_fakes = t.tensor(repeat(np.zeros((self.num_demos, 1, self.base_samples)), 'b c t -> b c (repeat t)', repeat = 7), device=device)
+                # Include conditioned and noisy audio in the demo
                 x_a, _, n_x = batch_postprocess(x_q, module.vqvae, module.level)
                 cond_a, _, n_c =  batch_postprocess(cond_q, module.vqvae, module.level)
                 full_fakes[:, :, :sample_length*6] += t.cat([cond_a, x_a, x_noise_audio, cond_a], dim = 2)
+                # Diffuse
                 fakes = module.diffusion.sample(
                         noise.float(),
                         embedding=embedding.float(),
                         embedding_scale=self.embedding_scale,
                         num_steps=self.demo_steps 
                       )
+                # Add diffused example to demo
                 fakes, sample_z, sample_q = batch_postprocess(fakes.detach(), module.vqvae, module.level)
                 full_fakes[:, :, sample_length*6:] += fakes
             else:
+                # Define noise
                 noise = t.randn([self.num_demos, 64, self.base_tokens]).to(device)
+                # Number of times to diffuse to get to demo length
                 hops = self.demo_samples//self.base_samples
+                # Full audio container
                 full_fakes = t.tensor(repeat(np.zeros((self.num_demos, 1, self.base_samples)), 'b c t -> b c (repeat t)', repeat = hops+5), device=device)
+                # Include conditioned and noisy audio in the demo
                 x_a, _, n_x = batch_postprocess(x_q, module.vqvae, module.level)
                 cond_a, _, n_c =  batch_postprocess(cond_q, module.vqvae, module.level)
                 full_fakes[:, :, :sample_length*5] += t.cat([cond_a, x_a, cond_a], dim = 2)
+                # Diffuse
                 for hop in tqdm.tqdm(range(hops)):
                     fakes = module.diffusion.sample(
                             noise.float(),
@@ -358,10 +393,13 @@ class DemoCallback(pl.Callback):
                             embedding_scale=self.embedding_scale, 
                             num_steps=self.demo_steps
                           )
+                    # Add diffused example to demo
                     fakes, sample_z, sample_q = batch_postprocess(fakes.detach(), module.vqvae, module.level)
                     sampled = rearrange(norm_pre(sample_q, module.vqvae, module.level), 'b c t -> b t c')
+                    # Update embedding
                     embedding = t.cat([*embedding.chunk(context_mult, dim=1)[1:], sampled], dim=1)
                     full_fakes[:, :, sample_length*(hop+5):sample_length*(hop+6)] += fakes
+                    # Sample randomly new noise
                     noise = t.randn([self.num_demos, 64, self.base_tokens]).to(device)
 
             # Put the demos together
@@ -369,9 +407,11 @@ class DemoCallback(pl.Callback):
 
             log_dict = {}
 
+            # Create path for demos
             demo_path = os.path.join(self.dirpath, 'demo_wavs')
             if not os.path.exists(demo_path):
                 os.mkdir(demo_path)
+            # Save & log demo
             filename = os.path.join(demo_path, f'demo_{trainer.global_step:08}.wav')
             full_fakes = full_fakes.clamp(-1, 1).mul(32767).to(t.int16).cpu()
             torchaudio.save(filename, full_fakes, self.sample_rate)
