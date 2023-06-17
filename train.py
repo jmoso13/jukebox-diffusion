@@ -42,7 +42,7 @@ def run(*args, **kwargs):
   diffusion_conf['embedding_max_length'] = context_mult*base_tokens
 
   # Load vqvae, dataloader, and their hyperparams
-  vqvae, dataloader, hps = make_jb(audio_dir, level, batch_size, base_tokens, aug_shift, num_workers)
+  vqvae, dataloader, hps = make_jb(audio_dir, level, batch_size, base_tokens, context_mult, aug_shift, num_workers)
 
   # Load and Train Diffusion Model
   sr = hps.sr
@@ -71,6 +71,7 @@ def run(*args, **kwargs):
 
   # Instantiate model
   diffusion_model = JBDiffusion(vqvae=vqvae, level=level, diffusion_kwargs=diffusion_conf)
+  print(diffusion_model)
 
   # Call trainer with WandB logging
   if log_to_wandb:

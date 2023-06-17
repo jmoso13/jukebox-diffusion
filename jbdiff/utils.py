@@ -38,7 +38,7 @@ class FilesAudioDataset(Dataset):
     - hps: hyperparameters built using setup_hyparams from jukebox repo
 
     '''
-    def __init__(self, hps):
+    def __init__(self, hps, context_mult):
         super().__init__()
         self.sr = hps.sr
         self.channels = hps.channels
@@ -148,7 +148,7 @@ class FilesAudioDataset(Dataset):
         return self.get_item(item)
 
 
-def make_jb(train_data, level, batch_size, base_tokens, aug_shift, num_workers):
+def make_jb(train_data, level, batch_size, base_tokens, context_mult, aug_shift, num_workers):
     '''
     Constructs vqvae model as well as the dataloader for batching
 
@@ -173,7 +173,7 @@ def make_jb(train_data, level, batch_size, base_tokens, aug_shift, num_workers):
     sample_length = base_tokens*level_mult
     vqvae, *priors = MODELS[base_model]
     hps = setup_hparams(vqvae, dict(sample_length=sample_length, audio_files_dir=train_data, labels=False, train_test_split=0.8, aug_shift=aug_shift, bs=batch_size))
-    dataset = FilesAudioDataset(hps)
+    dataset = FilesAudioDataset(hps, context_mult)
     dataloader = DataLoader(dataset, batch_size=hps.bs, num_workers=num_workers, pin_memory=False, drop_last=True)
     vqvae = make_vqvae(hps, device)
     return vqvae, dataloader, hps
