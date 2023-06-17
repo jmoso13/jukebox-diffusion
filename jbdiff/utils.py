@@ -369,7 +369,7 @@ class DemoCallback(pl.Callback):
                 # Include conditioned and noisy audio in the demo
                 x_a, _, n_x = batch_postprocess(x_q, module.vqvae, module.level)
                 cond_a, _, n_c =  batch_postprocess(cond_q, module.vqvae, module.level)
-                full_fakes[:, :, :sample_length*6] += t.cat([cond_a, x_a, x_noise_audio, cond_a], dim = 2)
+                full_fakes[:, :, :self.base_samples*6] += t.cat([cond_a, x_a, x_noise_audio, cond_a], dim = 2)
                 # Diffuse
                 fakes = module.diffusion.sample(
                         noise.float(),
@@ -379,7 +379,7 @@ class DemoCallback(pl.Callback):
                       )
                 # Add diffused example to demo
                 fakes, sample_z, sample_q = batch_postprocess(fakes.detach(), module.vqvae, module.level)
-                full_fakes[:, :, sample_length*6:] += fakes
+                full_fakes[:, :, self.base_samples*6:] += fakes
             else:
                 # Define noise
                 noise = t.randn([self.num_demos, 64, self.base_tokens]).to(device)
@@ -390,7 +390,7 @@ class DemoCallback(pl.Callback):
                 # Include conditioned and noisy audio in the demo
                 x_a, _, n_x = batch_postprocess(x_q, module.vqvae, module.level)
                 cond_a, _, n_c =  batch_postprocess(cond_q, module.vqvae, module.level)
-                full_fakes[:, :, :sample_length*5] += t.cat([cond_a, x_a, cond_a], dim = 2)
+                full_fakes[:, :, :self.base_samples*5] += t.cat([cond_a, x_a, cond_a], dim = 2)
                 # Diffuse
                 for hop in tqdm.tqdm(range(hops)):
                     fakes = module.diffusion.sample(
@@ -404,7 +404,7 @@ class DemoCallback(pl.Callback):
                     sampled = rearrange(norm_pre(sample_q, module.vqvae, module.level), 'b c t -> b t c')
                     # Update embedding
                     embedding = t.cat([*embedding.chunk(context_mult, dim=1)[1:], sampled], dim=1)
-                    full_fakes[:, :, sample_length*(hop+5):sample_length*(hop+6)] += fakes
+                    full_fakes[:, :, self.base_samples*(hop+5):self.base_samples*(hop+6)] += fakes
                     # Sample randomly new noise
                     noise = t.randn([self.num_demos, 64, self.base_tokens]).to(device)
 
