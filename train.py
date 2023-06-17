@@ -43,7 +43,7 @@ def run(*args, **kwargs):
 
   # Load vqvae, dataloader, and their hyperparams
   vqvae, dataloader, hps = make_jb(audio_dir, level, batch_size, base_tokens, context_mult, aug_shift, num_workers)
-
+  print('sample_length: ', hps.sample_length)
   # Load and Train Diffusion Model
   sr = hps.sr
   demo_samples = demo_seconds*sr
@@ -57,7 +57,7 @@ def run(*args, **kwargs):
       self.sample_size = demo_samples
       self.demo_steps = demo_steps
       self.sample_rate = sr
-      self.base_samples = sample_length
+      self.base_samples = hps.sample_length
       self.base_tokens = base_tokens
       self.dirpath = save_path
       self.embedding_scale = embedding_weight
