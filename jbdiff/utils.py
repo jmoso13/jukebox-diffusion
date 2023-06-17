@@ -287,9 +287,11 @@ class JBDiffusion(pl.LightningModule):
             # Run example through level below back to noisy audio
             _, x_noise_q = batch_preprocess(x, self.vqvae, self.level+1)
             x_noise_audio, _, _ = batch_postprocess(x_noise_q, self.vqvae, self.level+1)
-            # Preprocess and encode noisy audio at current level
+            x_noise_audio = rearrange(x_noise_audio, "b c t -> b t c")
             print(x_noise_audio.shape)
+            # Preprocess and encode noisy audio at current level
             _, x_noise = batch_preprocess(x_noise_audio, self.vqvae, self.level)
+            print(x_noise)
             with t.cuda.amp.autocast():
                 # Step
                 loss = self.diffusion(x_q, noise=x_noise, embedding=cond_q, embedding_mask_proba=0.1)
