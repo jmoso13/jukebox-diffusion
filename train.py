@@ -35,6 +35,7 @@ def run(*args, **kwargs):
   resume_pkl = kwargs['resume_network_pkl']
   num_workers = kwargs['num_workers']
   ckpt_every = kwargs['ckpt_every']
+  proj_name = kwargs['project_name']
 
   # Load diffusion config
   diffusion_conf = conf['model']['diffusion'][level]
@@ -47,7 +48,7 @@ def run(*args, **kwargs):
   # Load and Train Diffusion Model
   sr = hps.sr
   demo_samples = demo_seconds*sr
-  project_name = f'jbdiff_level_{level}'
+  project_name = f'jbdiff_{proj_name}_level_{level}'
 
   # Args for demos while training
   class DemoArgs:
@@ -162,6 +163,7 @@ def main():
   parser.add_argument('--demo-steps', help='Number of diffusion steps in demo', default=250, type=int)
   parser.add_argument('--embedding-weight', help='Conditioning embedding weight between 0-1 for demos', default=0.36, type=float)
   parser.add_argument('--ckpt-every', help='Number of training steps per checkpoint', default=5000, type=int)
+  parser.add_argument('--project-name', help='Name of project', default='jbdiff', type=str)
   args = parser.parse_args()
 
   run(**vars(args))
