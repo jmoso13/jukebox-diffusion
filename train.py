@@ -161,7 +161,7 @@ def main():
   parser.add_argument('--num-demos', help='Batch size of demos, must be <= batch_size of training', default=4, type=int)
   parser.add_argument('--demo-seconds', help='Length of each demo in seconds', default=10, type=int)
   parser.add_argument('--demo-steps', help='Number of diffusion steps in demo', default=250, type=int)
-  parser.add_argument('--embedding-weight', help='Conditioning embedding weight between 0-1 for demos', default=0.36, type=float)
+  parser.add_argument('--embedding-weight', help='Conditioning embedding weight for demos', default=3.66, type=float)
   parser.add_argument('--ckpt-every', help='Number of training steps per checkpoint', default=5000, type=int)
   parser.add_argument('--project-name', help='Name of project', default='jbdiff', type=str)
   args = parser.parse_args()
