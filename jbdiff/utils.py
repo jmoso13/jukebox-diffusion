@@ -367,7 +367,7 @@ class DemoCallback(pl.Callback):
                 noise = noise[:self.num_demos]
                 embedding = rearrange(noise, "b c t -> b t c")
                 # Full audio container
-                pad = t.tensor(np.zeros((self.num_demos, 1, self.base_samples)))
+                pad = t.tensor(np.zeros((self.num_demos, 1, self.base_samples)), device=device)
                 full_fakes = t.tensor(repeat(np.zeros((self.num_demos, 1, self.base_samples)), 'b c t -> b c (repeat t)', repeat = 6), device=device)
                 # Include conditioned and noisy audio in the demo
                 x_a, _, n_x = batch_postprocess(x_q, module.vqvae, module.level)
