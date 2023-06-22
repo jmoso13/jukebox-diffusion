@@ -3,7 +3,7 @@ model:
             batch_size: 32
             aug_shift: True
             base_tokens: 768
-            context_mult: 1
+            context_mult: 2
       diffusion:
             2: #Level 2 is bottom level of vqvae
                   net_t: audio_diffusion_pytorch.UNetV0
