@@ -363,13 +363,15 @@ class DemoCallback(pl.Callback):
         cond_q = rearrange(cond_q, "b c t -> b t c")
         try:
             if module.upsampler:
+                # Define noise
+                noise = t.randn([self.num_demos, 64, self.base_tokens]).to(device)
                 # If upsampler run audio through the lower level to extract noisy audio
                 _, x_noise_q = batch_preprocess(x, module.vqvae, module.level+1)
                 x_noise_audio, _, _ = batch_postprocess(x_noise_q, module.vqvae, module.level+1)
                 x_noise_audio = rearrange(x_noise_audio, "b c t -> b t c")
-                _, noise = batch_preprocess(x_noise_audio, module.vqvae, module.level)
-                noise = noise[:self.num_demos]
-                xn_q = rearrange(noise, "b c t -> b t c")
+                _, x_noise = batch_preprocess(x_noise_audio, module.vqvae, module.level)
+                x_noise = x_noise[:self.num_demos]
+                xn_q = rearrange(x_noise, "b c t -> b t c")
                 cond_size = cond_q.size(dim=1)
                 xn_size = xn_q.size(dim=1)
                 context_mult = cond_size // xn_size
