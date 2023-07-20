@@ -148,7 +148,7 @@ class FilesAudioDataset(Dataset):
         return self.get_item(item)
 
 
-def make_jb(train_data, level, batch_size, base_tokens, context_mult, aug_shift, num_workers):
+def make_jb(train_data, level, batch_size, base_tokens, context_mult, aug_shift, num_workers, train=True):
     '''
     Constructs vqvae model as well as the dataloader for batching
 
@@ -173,8 +173,11 @@ def make_jb(train_data, level, batch_size, base_tokens, context_mult, aug_shift,
     sample_length = base_tokens*level_mult
     vqvae, *priors = MODELS[base_model]
     hps = setup_hparams(vqvae, dict(sample_length=sample_length, audio_files_dir=train_data, labels=False, train_test_split=0.8, aug_shift=aug_shift, bs=batch_size))
-    dataset = FilesAudioDataset(hps, context_mult)
-    dataloader = DataLoader(dataset, batch_size=hps.bs, num_workers=num_workers, pin_memory=False, drop_last=True)
+    if train:
+        dataset = FilesAudioDataset(hps, context_mult)
+        dataloader = DataLoader(dataset, batch_size=hps.bs, num_workers=num_workers, pin_memory=False, drop_last=True)
+    else:
+        dataloader = None
     vqvae = make_vqvae(hps, device)
     return vqvae, dataloader, hps
 
@@ -304,6 +307,59 @@ class JBDiffusion(pl.LightningModule):
 
         self.log_dict(log_dict, prog_bar=True, on_step=True)
         return loss
+
+    def sample(noise, num_steps, init, init_strength, context, context_strength):
+        if init_audio is not None:
+            start_step = int(init_strength*num_steps)
+            sigmas = self.diffusion.sampler.schedule(num_steps + 1, device='cuda')
+            print('OG sigmas shape: ', sigmas.shape)
+            print(sigmas)
+            sigmas = sigmas[start_step:]
+            print('cut sigmas shape: ', sigmas.shape)
+            print(sigmas)
+            sigmas_batch = extend_dim(sigmas, dim=noise.ndim + 1)
+            print('sigmas_batch shape: ', sigmas_batch.shape)
+            alphas, betas = sampler.get_alpha_beta(sigmas_batch)
+            alpha, beta = alphas[0], betas[0]
+            print('alpha: ', alpha, "\nbeta: ", beta)
+            x_noisy = alpha*init + beta*noise
+            progress_bar = tqdm.tqdm(range(num_steps-start_step), disable=False)
+
+            for i in progress_bar:
+                v_pred = self.diffusion.sampler.net(x_noisy, sigmas[i], embedding=context, embedding_scale=context_strength)
+                x_pred = alphas[i] * x_noisy - betas[i] * v_pred
+                noise_pred = betas[i] * x_noisy + alphas[i] * v_pred
+                x_noisy = alphas[i + 1] * x_pred + betas[i + 1] * noise_pred
+                progress_bar.set_description(f"Sampling (noise={sigmas[i+1,0]:.2f})")
+
+            return x_noisy
+        else:
+            sample = self.diffusion.sample(
+                    noise,
+                    embedding=context,
+                    embedding_scale=context_strength, 
+                    num_steps=num_steps
+                    )
+
+            return sample
+
+    def get_init_context(context_audio_file, level_mults, context_num_frames, base_tokens, context_mult, sr):
+        level_mult = level_mults[self.level]
+        context_frames = context_mult*base_tokens*level_mult
+        cutoff = context_frames if context_frames <= context_num_frames else context_num_frames
+        offset = max(0, int(context_num_frames-context_frames))
+        data, _ = load_audio(context_audio, sr=sr, offset=offset, duration=cutoff)
+        context = np.zeros((data.shape[0], context_frames))
+        context[:, -cutoff:] += context_data
+        context = context.T
+        context = t.tensor(np.expand_dims(context, axis=0)).to('cuda', non_blocking=True).detach()
+        context_z, context_q = batch_preprocess(context, self.vqvae, self.level)
+        context_q = rearrange(context_q, "b c t -> b t c")
+
+        return context_q
+
+    def encode(audio):
+        return batch_preprocess(audio, self.vqvae, self.level)
 
     # def on_before_zero_grad(self, *args, **kwargs):
     #     decay = 0.95 if self.current_epoch < 25 else self.ema_decay
@@ -455,3 +511,13 @@ def parse_diff_conf(diff_conf):
     new_conf = {k:(get_obj_from_str(v) if '_t' in k else v) for k,v in diff_conf.items()}
     return new_conf
 
+
+def load_aud(fn, sr, offset, duration):
+    audio = load_audio(fn, sr=sr, offset=offset, duration=duration)
+    audio = audio.T
+    return t.tensor(np.expand_dims(audio, axis=0)).to('cuda', non_blocking=True).detach()
+
+
+def extend_dim(x: Tensor, dim: int):
+    # e.g. if dim = 4: shape [b] => [b, 1, 1, 1],
+    return x.view(*x.shape + (1,) * (dim - x.ndim))
