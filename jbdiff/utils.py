@@ -332,7 +332,10 @@ class JBDiffusion(pl.LightningModule):
                 x_noisy = alphas[i + 1] * x_pred + betas[i + 1] * noise_pred
                 progress_bar.set_description(f"Sampling (noise={sigmas[i+1,0]:.2f})")
 
-            return x_noisy
+            x_noisy_audio, _, _= batch_postprocess(x_noisy, self.vqvae, self.level)
+            x_noisy_audio = rearrange(x_noisy_audio, "b c t -> b t c")
+
+            return x_noisy, x_noisy_audio
         else:
             sample = self.diffusion.sample(
                     noise,
@@ -341,7 +344,10 @@ class JBDiffusion(pl.LightningModule):
                     num_steps=num_steps
                     )
 
-            return sample
+            sample_audio, _, _= batch_postprocess(sample, self.vqvae, self.level)
+            sample_audio = rearrange(sample_audio, "b c t -> b t c")
+
+            return sample, sample_audio
 
     def get_init_context(context_audio_file, level_mults, context_num_frames, base_tokens, context_mult, sr):
         level_mult = level_mults[self.level]

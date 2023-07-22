@@ -45,6 +45,7 @@ def run(*args, **kwargs):
 
   # Load Sampling Args
   sampling_conf = conf['sampling']['diffusion']
+  sampling_conf[2]['init_strength'] = init_strength
 
   # Load diffusion and vqvae models
   hps = dict()
@@ -82,19 +83,97 @@ def run(*args, **kwargs):
     context_windows[level] = diffusion_models[level].get_init_context(context_audio, level_mults, context_num_frames, base_tokens, context_mult, context_sr)
     diffusion_models[level] = diffusion_models[level].to('cpu')
 
-  for shift in num_window_shifts:
-    sample_level(diffusion_models, levels, 0, level_mults)
-    
-def sample_level(diffusion_models, levels, level_idx, level_mults, context_windows):
-  level = levels[level_idx]
-  diffusion_models[level] = diffusion_models[level].to('cuda')
-  # sample
-  diffusion_models[level] = diffusion_models[level].to('cpu')
-  save_sample
+  # Init Sample Windows
+  sample_windows
 
-  if level == levels[-1]:
-    sample_dd()
-    crossfade()
+  for shift in num_window_shifts:
+    noise = None
+    init = None
+    sample_level(diffusion_models, levels, 0, level_mults)
+
+class Sampler:
+  def __init__(self, cur_sample, diffusion_models, levels, level_mults, context_windows, final_audio_container, save_dir, sampling_conf):
+    self.cur_sample = cur_sample
+    self.diffusion_models = diffusion_models
+    self.levels = levels
+    self.level_mults = level_mults
+    self.context_windows = context_windows 
+    self.final_audio_container = final_audio_container
+    self.save_dir = save_dir
+    self.sampling_conf = sampling_conf
+  
+  def sample_level(self, step, steps, level_idx, noise, init):
+    level = self.levels[level_idx]
+    # To GPU
+    self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
+    # Cut up and encode noise & init
+    cur_noise = noise.chunk(steps, dim=2)[step]
+    _, noise_enc = self.diffusion_models[level].encode(cur_noise)
+    if init is not None:
+      cur_init = init.chunk(steps, dim=2)[step]
+      _, init_enc = self.diffusion_models[level].encode(cur_init)
+    else:
+      init_enc = None
+    # Grab hps from sampling conf
+    num_steps = self.sampling_conf[level]['num_steps']
+    init_strength = self.sampling_conf[level]['init_strength']
+    embedding_strength = self.sampling_conf[level]['embedding_strength']
+    context = self.context_windows[level]
+    # Sample
+    sample, sample_audio = self.diffusion_models[level].sample(noise=noise_enc, 
+                                                          num_steps=num_steps, 
+                                                          init=init_enc, 
+                                                          init_strength=init_strength, 
+                                                          context=context, 
+                                                          context_strength=embedding_strength)
+    diffusion_models[level] = self.diffusion_models[level].to('cpu')
+    self.save_sample_audio(sample_audio)
+
+    if level_idx == len(levels)-1:
+      sample_dd()
+      crossfade()
+
+  def save_sample_audio(self, sample_audio):
+    pass
+
+  def xfade(audio_1, audio_2)
+
+
+def sample_check(step, steps, level_idx, cur_sample, noise=np.zeros((1,1,768*2*128)), init=np.zeros((1,1,768*2*128)), levels=[2,1,0], level_mults={0:8, 1:32, 2:128}, context_windows={level:np.zeros((1,768*2,1)) for level in [2,1,0]}, final_audio=np.zeros((1,1,768*2*128))):
+  level = levels[level_idx]
+  print('cutting up and encoding audio into current level space')
+  print(f'cutting noise: {noise.shape} into {steps} steps')
+  cur_noise = np.split(noise, steps, axis=2)[step]
+  print(f'new noise shape: {cur_noise.shape}')
+  print(f'sampling level {level} on step {step}')
+  sampled_audio = np.zeros((1,1,768*level_mults[level])) + level
+  print('new sample: ')
+  print(sampled_audio, sampled_audio.shape)
+  print('saving sample')
+
+  if level_idx == len(levels)-1:
+    if cur_sample == 0:
+      print('cur_sample is zero, do not reach back')
+      dd_sample = np.zeros((1,1,768*level_mults[level])) -1
+    else:
+      print("grabbing frames from last level 0 sample for current dd upsample")
+      dd_sample = np.zeros((1,1,768*level_mults[level] + 1536)) -1
+    print("sampling DD level")
+    if cur_sample == 0:
+      print('not doing xfade since cur_sample is 0')
+    else:
+      print("doing xfade, this involves creating fade in for current sample and reaching back and performing fade out on old sample, grab both audio snips and pass to function to perform fade and then insert")
+    print('saving current level 0 sample as last_level_0, updating cur_sample')
+    cur_sample += 768*level_mults[level]
+    print(f"cur_sample: {cur_sample}")
+    return cur_sample
+  else:
+    next_steps = level_mults[level]//level_mults[levels[level_idx+1]]
+    print(f'next_steps: {next_steps}')
+    for next_step in range(next_steps):
+      cur_sample = sample_check(next_step, next_steps, level_idx+1, cur_sample=cur_sample, noise=sampled_audio, init=sampled_audio, levels=levels, level_mults=level_mults, context_windows=context_windows, final_audio=final_audio)
+      print('updating context_window at current level for next sampling step, grabbing from finished audio')
+    return cur_sample
 
 #----------------------------------------------------------------------------
 
