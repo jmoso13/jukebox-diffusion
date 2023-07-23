@@ -542,13 +542,14 @@ def get_base_noise(num_window_shifts, base_tokens, style='random'):
 
 
 class Sampler:
-    def __init__(self, cur_sample, diffusion_models, levels, level_mults, context_windows, final_audio_container, save_dir, sampling_conf, sr, use_dd):
+    def __init__(self, cur_sample, diffusion_models, levels, level_mults, base_tokens, context_windows, final_audio_container, save_dir, sampling_conf, sr, use_dd):
         self.cur_sample = cur_sample
         self.sr = sr
         self.use_dd = use_dd
         self.diffusion_models = diffusion_models
         self.levels = levels
         self.level_mults = level_mults
+        self.base_tokens = base_tokens
         self.context_windows = context_windows 
         self.final_audio_container = final_audio_container
         self.save_dir = save_dir
@@ -556,6 +557,14 @@ class Sampler:
         self.last_layer_0 = None
         self.xfade_style = xfade_style.lower()
         assert self.xfade_style in ('linear, constant-power'), "chosen xfade_style has to be either 'linear' or 'constant-power', please alter in yaml"
+        if self.use_dd:
+            self.dd_base_samples = self.base_tokens*self.level_mults[self.levels[-1]]
+            self.dd_xfade_samples = self.sampling_conf["dd"]["xfade_samples"]
+            dd_sample_size = self.dd_base_samples+self.dd_xfade_samples
+            dd_ckpt = self.sampling_conf["dd"]["ckpt_loc"]
+            self.dd_model = DDModel(sample_size=dd_sample_size, sr=self.sr, custom_ckpt_path=dd_ckpt)
+            self.dd_steps = self.sampling_conf["dd"]["num_steps"]
+            self.dd_init_strength = self.sampling_conf["dd"]["init_strength"]
 
     def sample_level(self, step, steps, level_idx, noise, init):
         level = self.levels[level_idx]
@@ -587,28 +596,26 @@ class Sampler:
         self.diffusion_models[level] = self.diffusion_models[level].to('cpu')
         self.save_sample_audio(sample_audio, level)
 
-        if level_idx == len(levels)-1:
-            if self.use_dd:
-                sample_dd()
-                self.xfade()
         if level_idx == len(self.levels)-1:
             if self.use_dd:
                 sample_audio = rearrange(sample_audio, "b t c -> b c t")
                 if self.cur_sample == 0:
-                    print('cur_sample is zero, do not reach back')
-                    dd_sample = np.zeros((1,1,768*level_mults[level])) -1
+                    padding = np.zeros((1,1,self.dd_xfade_samples))
+                    dd_init = t.cat([padding, sample_audio], dim=2)
                 else:
-                    print("grabbing frames from last level 0 sample for current dd upsample")
-                    dd_sample = np.zeros((1,1,768*level_mults[level] + 1536)) -1
-                print("sampling DD level")
-                if cur_sample == 0:
-                    print('not doing xfade since cur_sample is 0')
-                else:
+                    padding = self.last_layer_0[-self.dd_xfade_samples:]
+                    dd_init = t.cat([padding, sample_audio], dim=2)
+
+                dd_sample = self.dd_model.sample(dd_init, self.dd_steps, self.dd_init_strength)
+
+                main_sample = dd_sample[:,:,self.dd_xfade_samples:]
+                self.final_audio_container[:,:,self.cur_sample:self.cur_sample+self.dd_base_samples] = main_sample
+
+                if self.cur_sample >= self.dd_xfade_samples:
                     print("doing xfade, this involves creating fade in for current sample and reaching back and performing fade out on old sample, grab both audio snips and pass to function to perform fade and then insert")
-                print('saving current level 0 sample as last_level_0, updating cur_sample')
-                cur_sample += 768*level_mults[level]
-                print(f"cur_sample: {cur_sample}")
-                return cur_sample
+                self.last_layer_0 = sample_audio
+                self.cur_sample += self.base_tokens*self.level_mults[level]
+                return None
         else:
             next_steps = level_mults[level]//level_mults[levels[level_idx+1]]
             print(f'next_steps: {next_steps}')

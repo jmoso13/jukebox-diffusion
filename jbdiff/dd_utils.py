@@ -89,13 +89,12 @@ class DDModel:
 
     # # Remove non-EMA
     del self.model.diffusion
-    self.model_fn = self.model.diffusion_ema
     self.sampler_type = "v-ddim" 
     self.eta = 0
 
   def sample(audio_sample, steps, init_strength):
     noise_level = 1.0-init_strength
     stereo_audio = self.augs(audio_sample).unsqueeze(0)
-    generated = resample(self.model_fn, stereo_audio, steps, sampler_type=self.sampler_type, noise_level=noise_level)
+    generated = resample(self.model.diffusion_ema, stereo_audio, steps, sampler_type=self.sampler_type, noise_level=noise_level)
 
     return generated
