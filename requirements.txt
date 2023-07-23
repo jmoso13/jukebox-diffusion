@@ -19,3 +19,5 @@ tqdm==4.57.0
 pillow
 git+https://github.com/jmoso13/jukebox.git
 PyYAML
+git+https://github.com/Harmonai-org/sample-generator.git
+git+https://github.com/crowsonkb/v-diffusion-pytorch.git

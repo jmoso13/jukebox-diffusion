@@ -19,9 +19,11 @@ from einops import rearrange, repeat
 # t.set_float32_matmul_precision('medium')
 import pytorch_lightning as pl
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
+import matplotlib.pyplot as plt
 from audio_diffusion_pytorch import DiffusionModel, UNetV0, VDiffusion, VSampler
 import sys
 import torchaudio
+import torchaudio.transforms as transforms
 import wandb
 import tqdm
 import yaml
@@ -309,7 +311,7 @@ class JBDiffusion(pl.LightningModule):
         return loss
 
     def sample(noise, num_steps, init, init_strength, context, context_strength):
-        if init_audio is not None:
+        if init is not None:
             start_step = int(init_strength*num_steps)
             sigmas = self.diffusion.sampler.schedule(num_steps + 1, device='cuda')
             print('OG sigmas shape: ', sigmas.shape)
@@ -527,3 +529,126 @@ def load_aud(fn, sr, offset, duration):
 def extend_dim(x: Tensor, dim: int):
     # e.g. if dim = 4: shape [b] => [b, 1, 1, 1],
     return x.view(*x.shape + (1,) * (dim - x.ndim))
+
+
+def get_base_noise(num_window_shifts, base_tokens, style='random'):
+    if style == 'random':
+        return t.randn([1, 64, num_window_shifts*base_tokens]).to(device)
+    elif style == 'constant':
+        r_noise = t.randn([1, 64, base_tokens])
+        return t.cat([r_noise for s in range(num_window_shifts)], dim=2).to(device)
+    else:
+        raise Exception("Noise style must be either 'constant' or 'random'")
+
+
+class Sampler:
+    def __init__(self, cur_sample, diffusion_models, levels, level_mults, context_windows, final_audio_container, save_dir, sampling_conf, sr, use_dd):
+        self.cur_sample = cur_sample
+        self.sr = sr
+        self.use_dd = use_dd
+        self.diffusion_models = diffusion_models
+        self.levels = levels
+        self.level_mults = level_mults
+        self.context_windows = context_windows 
+        self.final_audio_container = final_audio_container
+        self.save_dir = save_dir
+        self.sampling_conf = sampling_conf
+        self.last_layer_0 = None
+        self.xfade_style = xfade_style.lower()
+        assert self.xfade_style in ('linear, constant-power'), "chosen xfade_style has to be either 'linear' or 'constant-power', please alter in yaml"
+
+    def sample_level(self, step, steps, level_idx, noise, init):
+        level = self.levels[level_idx]
+        # To GPU
+        self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
+        # Cut up and encode noise & init
+        cur_noise = noise.chunk(steps, dim=2)[step]
+        if level < 2:
+            _, noise_enc = self.diffusion_models[level].encode(cur_noise)
+        else:
+            noise_enc = cur_noise
+        if init is not None:
+            cur_init = init.chunk(steps, dim=2)[step]
+            _, init_enc = self.diffusion_models[level].encode(cur_init)
+        else:
+            init_enc = None
+        # Grab hps from sampling conf
+        num_steps = self.sampling_conf[level]['num_steps']
+        init_strength = self.sampling_conf[level]['init_strength']
+        embedding_strength = self.sampling_conf[level]['embedding_strength']
+        context = self.context_windows[level]
+        # Sample
+        sample, sample_audio = self.diffusion_models[level].sample(noise=noise_enc, 
+                                                              num_steps=num_steps, 
+                                                              init=init_enc, 
+                                                              init_strength=init_strength, 
+                                                              context=context, 
+                                                              context_strength=embedding_strength)
+        self.diffusion_models[level] = self.diffusion_models[level].to('cpu')
+        self.save_sample_audio(sample_audio, level)
+
+        if level_idx == len(levels)-1:
+            if self.use_dd:
+                sample_dd()
+                self.xfade()
+        if level_idx == len(self.levels)-1:
+            if self.use_dd:
+                sample_audio = rearrange(sample_audio, "b t c -> b c t")
+                if self.cur_sample == 0:
+                    print('cur_sample is zero, do not reach back')
+                    dd_sample = np.zeros((1,1,768*level_mults[level])) -1
+                else:
+                    print("grabbing frames from last level 0 sample for current dd upsample")
+                    dd_sample = np.zeros((1,1,768*level_mults[level] + 1536)) -1
+                print("sampling DD level")
+                if cur_sample == 0:
+                    print('not doing xfade since cur_sample is 0')
+                else:
+                    print("doing xfade, this involves creating fade in for current sample and reaching back and performing fade out on old sample, grab both audio snips and pass to function to perform fade and then insert")
+                print('saving current level 0 sample as last_level_0, updating cur_sample')
+                cur_sample += 768*level_mults[level]
+                print(f"cur_sample: {cur_sample}")
+                return cur_sample
+        else:
+            next_steps = level_mults[level]//level_mults[levels[level_idx+1]]
+            print(f'next_steps: {next_steps}')
+            for next_step in range(next_steps):
+                cur_sample = sample_check(next_step, next_steps, level_idx+1, cur_sample=cur_sample, noise=sampled_audio, init=sampled_audio, levels=levels, level_mults=level_mults, context_windows=context_windows, final_audio=final_audio)
+                print('updating context_window at current level for next sampling step, grabbing from finished audio')
+            return cur_sample
+
+    def save_sample_audio(self, sample_audio, level):
+        # Reshape Audio and Save
+        audio = rearrange(sample_audio, 'b t c -> c (b t)')
+        level_loc = os.path.join(self.save_dir, level)
+        if not os.path.exists(level_loc):
+            os.mkdir(level_loc)
+        audio_fn = os.path.join(level_loc, f"{self.cur_sample:09d}.wav")
+        final_audio = audio.clamp(-1, 1).mul(32767).to(t.int16).cpu()
+        torchaudio.save(audio_fn, final_audio, self.sr)
+
+        # Create a MelSpectrogram
+        mel_spectrogram = transforms.MelSpectrogram(
+            sample_rate=self.sr,
+            n_mels=16
+        )
+        # Compute the mel spectrogram
+        mel_spec = mel_spectrogram(audio)
+        # Convert the power spectrogram to decibels
+        mel_spec_db = transforms.AmplitudeToDB()(mel_spec)
+        # Convert the spectrogram tensor to a NumPy array for visualization
+        mel_spec_db_np = mel_spec_db.squeeze(0).numpy()
+        # Save the mel spectrogram as an image
+        mel_fn = os.path.join(level_loc, f"{self.cur_sample:09d}.png")
+        plt.figure(figsize=(10, 4))
+        plt.imshow(mel_spec_db_np, origin='lower', cmap='viridis', aspect='auto')
+        plt.colorbar(format='%+2.0f dB')
+        plt.xlabel('Time')
+        plt.ylabel('Mel Frequency')
+        plt.tight_layout()
+        plt.savefig(mel_fn)
+        plt.close()
+
+
+    def xfade(self, audio_1, audio_2):
+        pass
