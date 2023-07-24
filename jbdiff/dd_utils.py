@@ -43,7 +43,7 @@ def alpha_sigma_to_t(alpha, sigma):
     return torch.atan2(sigma, alpha) / math.pi * 2
 
 
-def resample(model_fn, audio, steps=100, sampler_type="v-ddim", noise_level = 1.0):
+def resample(model_fn, audio, noise, steps=100, sampler_type="v-ddim", noise_level = 1.0):
   #Noise the input
   if sampler_type.startswith("v-"):
     t = torch.linspace(0, 1, steps + 1, device=device)
@@ -51,20 +51,20 @@ def resample(model_fn, audio, steps=100, sampler_type="v-ddim", noise_level = 1.
     step_list = step_list[step_list < noise_level]
 
     alpha, sigma = t_to_alpha_sigma(step_list[-1])
-    noised = torch.randn([1, 2, audio.shape[-1]], device='cuda')
+    noised = noise
     noised = audio * alpha + noised * sigma
-    noise = noised
+    noise_sample = noised
 
   # Denoise
   if sampler_type == "v-iplms":
     return sampling.iplms_sample(model_fn, noised, step_list.flip(0)[:-1], {})
 
   if sampler_type == "v-ddim":
-    return sampling.sample(model_fn, noise, step_list.flip(0)[:-1], 0, {})
+    return sampling.sample(model_fn, noise_sample, step_list.flip(0)[:-1], 0, {})
 
 
 class DDModel:
-  def __init__(self, sample_size, sr, custom_ckpt_path):
+  def __init__(self, sample_size, sr, custom_ckpt_path, sampler_type="v-ddim"):
     self.sample_size = sample_size
     self.sample_rate = sr 
     self.latent_dim = 0  
@@ -89,12 +89,14 @@ class DDModel:
 
     # # Remove non-EMA
     del self.model.diffusion
-    self.sampler_type = "v-ddim" 
+    self.sampler_type = sampler_type
     self.eta = 0
 
-  def sample(audio_sample, steps, init_strength):
+  def sample(audio_sample, steps, init_strength, noise):
     noise_level = 1.0-init_strength
     stereo_audio = self.augs(audio_sample).unsqueeze(0)
-    generated = resample(self.model.diffusion_ema, stereo_audio, steps, sampler_type=self.sampler_type, noise_level=noise_level)
+    self.model = self.model.to('cuda')
+    generated = resample(self.model.diffusion_ema, stereo_audio, noise, steps, sampler_type=self.sampler_type, noise_level=noise_level)
+    self.model = self.model.to('cpu')
 
     return generated

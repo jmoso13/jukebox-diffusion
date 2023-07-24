@@ -1,6 +1,6 @@
 import os
 import argparse
-from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud_file, get_base_noise, Sampler
+from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler
 import wave
 from glob import glob
 
@@ -22,27 +22,34 @@ def run(*args, **kwargs):
   base_tokens = vqvae_conf['base_tokens']
 
   # Load args from command line
+  sr = 44100
   seconds_length = kwargs['seconds_length']
+  levels = kwargs['levels']
+  # Check init audio
   init_audio = kwargs['init_audio']
   if init_audio is not None:
     with wave.open(init_audio, 'rb') as wav_file:
       init_num_frames = wav_file.getnframes()
       init_sr = wav_file.getframerate()
-      assert init_sr == 44100, "init wav file must be 44100 sample rate to work with JBDiffusion"
+      assert init_sr == sr, f"init wav file must be {sr} sample rate to work with JBDiffusion"
       seconds_length = float(init_num_frames)/float(init_sr)
   init_strength = kwargs['init_strength']
+  # Check context audio
   context_audio = kwargs['context_audio']
   if context_audio is not None:
     with wave.open(context_audio, 'rb') as wav_file:
       context_num_frames = wav_file.getnframes()
       context_sr = wav_file.getframerate()
-      assert context_sr == 44100, "context wav file must be 44100 sample rate to work with JBDiffusion"
+      assert context_sr == sr, f"context wav file must be {sr} sample rate to work with JBDiffusion"
+  # Noise Params
+  noise_seed = kwargs['noise_seed']
+  noise_style = kwargs['noise_style'].lower()
+  dd_noise_seed = kwargs['dd_noise_seed']
+  dd_noise_style = kwargs['dd_noise_style'].lower()
+  # Set up directories
   save_dir = kwargs['save_dir']
   if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
-  levels = kwargs['levels']
-  # Set up directories
-  noise_style = kwargs['noise_style'].lower()
+    os.mkdir(save_dir) 
   project_name = kwargs['project_name']
   if os.path.exists(os.path.join(save_dir, project_name)):
     num_paths = len(glob(os.path.join(save_dir,f"{project_name}_*")))
@@ -53,18 +60,20 @@ def run(*args, **kwargs):
   # Adapt command line args
   use_dd = 'dd' in levels
   levels = list(reversed(sorted([l for l in levels if l in (0,1,2)])))
+  if noise_seed is None:
+    noise_seed = ... # TODO, implement random generation of noise_seed
+  if dd_noise_seed is None:
+    dd_noise_seed = ... # TODO, implement random generation of dd_noise_seed
 
   # Load Sampling Args
   sampling_conf = conf['sampling']['diffusion']
   sampling_conf[2]['init_strength'] = init_strength
 
   # Load diffusion and vqvae models
-  hps = dict()
   diffusion_models = dict()
   for level in levels:
     # Load VQ-VAEs
-    vqvae, _, hps[level] = make_jb(audio_dir, level, batch_size, base_tokens, context_mult, aug_shift, num_workers, train=False)
-    print(f'Sample length for level {level}: {hps[level].sample_length}')
+    vqvae, _, _ = make_jb(audio_dir, level, batch_size, base_tokens, context_mult, aug_shift, num_workers, train=False)
     # Load Diff Models
     diffusion_conf = conf['model']['diffusion'][level]
     diffusion_conf = parse_diff_conf(diffusion_conf)
@@ -81,13 +90,16 @@ def run(*args, **kwargs):
     print(f"Level {k} VQVAE on device: {v.vqvae.device}")
     print(f"Level {k} Diffusion Model on device: {v.diffusion.device}")
 
-  # Sample
+  # Setup for Sampling
   level_mults = {0:8, 1:32, 2:128}
-  lowest_sample_window_length = hps.sample_length
-  num_window_shifts = int((seconds_length*hps.sr)//lowest_sample_window_length)
-  leftover_window = round(seconds_length*hps.sr) - num_window_shifts*lowest_sample_window_length
+  lowest_sample_window_length = base_tokens*level_mults[levels[0]]
+  num_window_shifts = int((seconds_length*sr)//lowest_sample_window_length)
+  leftover_window = round(seconds_length*sr) - num_window_shifts*lowest_sample_window_length
   if leftover_window > 0:
     num_window_shifts += 1
+    pad = leftover_window
+  else:
+    pad = None
 
   # Init contexts
   context_windows = dict()
@@ -96,49 +108,50 @@ def run(*args, **kwargs):
     context_windows[level] = diffusion_models[level].get_init_context(context_audio, level_mults, context_num_frames, base_tokens, context_mult, context_sr)
     diffusion_models[level] = diffusion_models[level].to('cpu')
 
-  noise = get_base_noise(num_window_shifts, base_tokens, style=noise_style)
+  # Init noise
+  noise = get_base_noise(num_window_shifts, base_tokens, noise_seed, style=noise_style)
 
-  for shift in num_window_shifts:
-    noise = None
-    init = None
-    sample_level(diffusion_models, levels, 0, level_mults)
+  # Load Init Audio and Init Final Audio Container
+  if init_audio is not None:
+    init_audio = load_aud(init_audio, sr, 0, init_num_frames, pad=pad)
 
+  print(f'init_audio shape: {init_audio.shape}\ndivided by {num_window_shifts} == {init_audio.shape[1]/num_window_shifts}')
+  print(f'noise shape: {noise.shape}\ndivided by {num_window_shifts} == {noise.shape[2]/num_window_shifts}')
 
-def sample_check(step, steps, level_idx, cur_sample, noise=np.zeros((1,1,768*2*128)), init=np.zeros((1,1,768*2*128)), levels=[2,1,0], level_mults={0:8, 1:32, 2:128}, context_windows={level:np.zeros((1,768*2,1)) for level in [2,1,0]}, final_audio=np.zeros((1,1,768*2*128))):
-  level = levels[level_idx]
-  print('cutting up and encoding audio into current level space')
-  print(f'cutting noise: {noise.shape} into {steps} steps')
-  cur_noise = np.split(noise, steps, axis=2)[step]
-  print(f'new noise shape: {cur_noise.shape}')
-  print(f'sampling level {level} on step {step}')
-  sampled_audio = np.zeros((1,1,768*level_mults[level])) + level
-  print('new sample: ')
-  print(sampled_audio, sampled_audio.shape)
-  print('saving sample')
+  # Define sampling args
+  class SamplingArgs:
+    def __init__(self):
+      self.levels = levels
+      self.level_mults = level_mults
+      self.base_tokens = base_tokens
+      self.context_mult = context_mult
+      self.save_dir = save_dir
+      self.sr = sr
+      self.use_dd = use_dd
+      self.sampling_conf = sampling_conf
+      self.xfade_style = xfade_style
+      self.dd_noise = torch.randn([1, 2, audio.shape[-1]], device='cuda') # TODO, change to be based off dd_noise_seed
+      self.dd_noise_style = dd_noise_style
 
-  if level_idx == len(levels)-1:
-    if cur_sample == 0:
-      print('cur_sample is zero, do not reach back')
-      dd_sample = np.zeros((1,1,768*level_mults[level])) -1
-    else:
-      print("grabbing frames from last level 0 sample for current dd upsample")
-      dd_sample = np.zeros((1,1,768*level_mults[level] + 1536)) -1
-    print("sampling DD level")
-    if cur_sample == 0:
-      print('not doing xfade since cur_sample is 0')
-    else:
-      print("doing xfade, this involves creating fade in for current sample and reaching back and performing fade out on old sample, grab both audio snips and pass to function to perform fade and then insert")
-    print('saving current level 0 sample as last_level_0, updating cur_sample')
-    cur_sample += 768*level_mults[level]
-    print(f"cur_sample: {cur_sample}")
-    return cur_sample
-  else:
-    next_steps = level_mults[level]//level_mults[levels[level_idx+1]]
-    print(f'next_steps: {next_steps}')
-    for next_step in range(next_steps):
-      cur_sample = sample_check(next_step, next_steps, level_idx+1, cur_sample=cur_sample, noise=sampled_audio, init=sampled_audio, levels=levels, level_mults=level_mults, context_windows=context_windows, final_audio=final_audio)
-      print('updating context_window at current level for next sampling step, grabbing from finished audio')
-    return cur_sample
+  # Load Sampler
+  sample_args = SamplingArgs()
+  sampler = Sampler(cur_sample=0, 
+                    diffusion_models=diffusion_models, 
+                    context_windows=context_windows, 
+                    final_audio_container=final_audio_container, 
+                    sampling_args=sample_args
+                  )
+
+  for shift in range(num_window_shifts):
+    sampler.sample_level( step=shift, 
+                          steps=num_window_shifts, 
+                          level_idx=0, 
+                          noise=noise, 
+                          init=init_audio
+                        )
+    sampler.update_context_window(levels[0])
+
+  # TODO crop and save final audio file, collect and save all level wavs and spectrograms
 
 #----------------------------------------------------------------------------
 
@@ -179,8 +192,11 @@ def main():
   parser.add_argument('--context-audio', help='Provide the location of context audio', required=True, metavar='FILE', type=_path_exists)
   parser.add_argument('--save-dir', help='Name of directory for saved files', required=True, type=str)
   parser.add_argument('--levels', help='Levels to use for upsampling', default=[0,1,2,'dd'], type=list)
-  parser.add_argument('--noise-style', help='Random noise style means every sample uses a new randomly generated noise, constant noise style uses the same randomly generated noise for every diffused sample', default='random', type=str)
+  parser.add_argument('--noise-seed', help='Random seed to use for sampling base layer of Jukebox Diffusion', default=None, type=int)
+  parser.add_argument('--noise-style', help='How the random noise for generating base layer of Jukebox Diffusion progresses: random, constant, region', default='random', type=str)
   parser.add_argument('--project-name', help='Name of project', default='JBDiffusion', type=str)
+  parser.add_argument('--dd-noise-seed', help='Random seed to use for sampling Dance Diffusion', default=None, type=int)
+  parser.add_argument('--dd-noise-style', help='How the random noise for generating in Dance Diffusion progresses: random, constant, region', default='random', type=str)
   # parser.add_argument('--lowest-level-pkl', help='Location of lowest level network pkl for use in sampling', default=None, metavar='FILE', type=_path_exists)
   # parser.add_argument('--middle-level-pkl', help='Location of middle level network pkl for use in sampling', default=None, metavar='FILE', type=_path_exists)
   # parser.add_argument('--highest-level-pkl', help='Location of highest level network pkl for use in sampling', default=None, metavar='FILE', type=_path_exists)

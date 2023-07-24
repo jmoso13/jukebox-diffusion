@@ -520,8 +520,11 @@ def parse_diff_conf(diff_conf):
     return new_conf
 
 
-def load_aud(fn, sr, offset, duration):
-    audio = load_audio(fn, sr=sr, offset=offset, duration=duration)
+def load_aud(fn, sr, offset, duration, pad=None):
+    audio, _ = load_audio(fn, sr=sr, offset=offset, duration=duration)
+    if pad is not None:
+        padded_tensor = t.tensor(np.zeros((audio.shape[0], pad)))
+        audio = t.cat([audio, padded_tensor], dim=1)
     audio = audio.T
     return t.tensor(np.expand_dims(audio, axis=0)).to('cuda', non_blocking=True).detach()
 
@@ -530,32 +533,36 @@ def extend_dim(x: Tensor, dim: int):
     # e.g. if dim = 4: shape [b] => [b, 1, 1, 1],
     return x.view(*x.shape + (1,) * (dim - x.ndim))
 
-
-def get_base_noise(num_window_shifts, base_tokens, style='random'):
+# TODOS
+def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random'):
     if style == 'random':
+        # Implement Noise Seed behavior
         return t.randn([1, 64, num_window_shifts*base_tokens]).to(device)
     elif style == 'constant':
         r_noise = t.randn([1, 64, base_tokens])
         return t.cat([r_noise for s in range(num_window_shifts)], dim=2).to(device)
+    elif style == 'region':
+        # Implement random region walk
     else:
         raise Exception("Noise style must be either 'constant' or 'random'")
 
 
 class Sampler:
-    def __init__(self, cur_sample, diffusion_models, levels, level_mults, base_tokens, context_windows, final_audio_container, save_dir, sampling_conf, sr, use_dd):
+    def __init__(self, cur_sample, diffusion_models, context_windows, final_audio_container, sampling_args):
         self.cur_sample = cur_sample
-        self.sr = sr
-        self.use_dd = use_dd
+        self.sr = sampling_args.sr
+        self.use_dd = sampling_args.use_dd
         self.diffusion_models = diffusion_models
-        self.levels = levels
-        self.level_mults = level_mults
-        self.base_tokens = base_tokens
-        self.context_windows = context_windows 
+        self.levels = sampling_args.levels
+        self.level_mults = sampling_args.level_mults
+        self.base_tokens = sampling_args.base_tokens
+        self.context_windows = context_windows
+        self.context_mult = sampling_args.context_mult 
         self.final_audio_container = final_audio_container
-        self.save_dir = save_dir
-        self.sampling_conf = sampling_conf
+        self.save_dir = sampling_args.save_dir
+        self.sampling_conf = sampling_args.sampling_conf
         self.last_layer_0 = None
-        self.xfade_style = xfade_style.lower()
+        self.xfade_style = sampling_args.xfade_style.lower()
         assert self.xfade_style in ('linear, constant-power'), "chosen xfade_style has to be either 'linear' or 'constant-power', please alter in yaml"
         if self.use_dd:
             self.dd_base_samples = self.base_tokens*self.level_mults[self.levels[-1]]
@@ -565,6 +572,8 @@ class Sampler:
             self.dd_model = DDModel(sample_size=dd_sample_size, sr=self.sr, custom_ckpt_path=dd_ckpt)
             self.dd_steps = self.sampling_conf["dd"]["num_steps"]
             self.dd_init_strength = self.sampling_conf["dd"]["init_strength"]
+            self.dd_noise = sampling_args.dd_noise
+            self.dd_noise_style = sampling_args.dd_noise_style
 
     def sample_level(self, step, steps, level_idx, noise, init):
         level = self.levels[level_idx]
@@ -597,6 +606,7 @@ class Sampler:
         self.save_sample_audio(sample_audio, level)
 
         if level_idx == len(self.levels)-1:
+            # Upsample using Dance Diffusion
             if self.use_dd:
                 sample_audio = rearrange(sample_audio, "b t c -> b c t")
                 if self.cur_sample == 0:
@@ -605,24 +615,32 @@ class Sampler:
                 else:
                     padding = self.last_layer_0[-self.dd_xfade_samples:]
                     dd_init = t.cat([padding, sample_audio], dim=2)
-
-                dd_sample = self.dd_model.sample(dd_init, self.dd_steps, self.dd_init_strength)
-
+                # Sample
+                dd_sample = self.dd_model.sample(dd_init, self.dd_steps, self.dd_init_strength, self.dd_noise)
+                # Insert main chunk
                 main_sample = dd_sample[:,:,self.dd_xfade_samples:]
                 self.final_audio_container[:,:,self.cur_sample:self.cur_sample+self.dd_base_samples] = main_sample
-
+                # Crossfade if we have audio to fade with
                 if self.cur_sample >= self.dd_xfade_samples:
-                    print("doing xfade, this involves creating fade in for current sample and reaching back and performing fade out on old sample, grab both audio snips and pass to function to perform fade and then insert")
+                    fade_in = dd_sample[:,:,:self.dd_xfade_samples]
+                    fade_out = self.final_audio_container[:,:,self.cur_sample-self.dd_xfade_samples:self.cur_sample]
+                    xfade = self.xfade(fade_out, fade_in)
+                    self.final_audio_container[:,:,self.cur_sample-self.dd_xfade_samples:self.cur_sample] = xfade
                 self.last_layer_0 = sample_audio
                 self.cur_sample += self.base_tokens*self.level_mults[level]
+                self.update_dd_noise()
                 return None
         else:
             next_steps = level_mults[level]//level_mults[levels[level_idx+1]]
             print(f'next_steps: {next_steps}')
             for next_step in range(next_steps):
-                cur_sample = sample_check(next_step, next_steps, level_idx+1, cur_sample=cur_sample, noise=sampled_audio, init=sampled_audio, levels=levels, level_mults=level_mults, context_windows=context_windows, final_audio=final_audio)
+                # Sample next level... 
+                # TODO: create version to sample using traditional diffusion rather than upsampling trick
+                # Using noise_style either provide frozen sampled noise or newly sampled noise every iter for each level
+                self.sample_level(next_step, next_steps, level_idx+1, noise=sampled_audio, init=sampled_audio)
+                self.update_context_window(self.levels[level_idx+1])
                 print('updating context_window at current level for next sampling step, grabbing from finished audio')
-            return cur_sample
+            return None
 
     def save_sample_audio(self, sample_audio, level):
         # Reshape Audio and Save
@@ -656,6 +674,26 @@ class Sampler:
         plt.savefig(mel_fn)
         plt.close()
 
+    def xfade(self, fade_out, fade_in, xfade_style=self.xfade_style):
+        assert fade_out.shape[2] == fade_in.shape[2], "Fades are not the same size, investigate"
+        num_samples = fade_out.shape[2]
+        if xfade_style == 'linear':
+            fade_weights = t.linspace(0.0, 1.0, num_samples, device=fade_out.device)
+        elif xfade_style == 'constant-power':
+            fade_weights = torch.sin((math.pi / 2) * t.linspace(0.0, 1.0, num_samples, device=fade_out.device))
+        new_fade_out = fade_out*(1 - fade_weights)
+        new_fade_in = fade_in*fade_weights 
+        crossfaded_audio = new_fade_in + new_fade_out       
 
-    def xfade(self, audio_1, audio_2):
+    def update_context_window(self, level):
+        cur_context = self.context_windows[level]
+        window_shift_length = self.base_tokens*self.level_mults[level]
+        new_audio = self.final_audio_container[:,:,self.cur_sample-window_shift_length:self.cur_sample]
+        new_audio = rearrange(new_audio, "b c t -> b t c")
+        _, new_audio_enc = self.diffusion_models[level].encode(new_audio)
+        new_audio_enc = rearrange(new_audio_enc, "b c t -> b t c")
+        self.context_windows[level] = t.cat([*cur_context.chunk(self.context_mult, dim=1)[1:], new_audio_enc], dim=1)
+
+    def update_dd_noise(self):
+        # TODO, implement updating of dd_noise based off of current noise/noise_style/random_generator
         pass
