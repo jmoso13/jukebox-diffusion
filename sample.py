@@ -3,6 +3,8 @@ import argparse
 from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler
 import wave
 from glob import glob
+import numpy as np
+import time
 
 #----------------------------------------------------------------------------
 
@@ -44,26 +46,34 @@ def run(*args, **kwargs):
   # Noise Params
   noise_seed = kwargs['noise_seed']
   noise_style = kwargs['noise_style'].lower()
+  noise_step_size = kwargs['noise_step_size']
   dd_noise_seed = kwargs['dd_noise_seed']
   dd_noise_style = kwargs['dd_noise_style'].lower()
-  # Set up directories
+  dd_noise_step_size = kwargs['dd_noise_step_size']
+  # Direc params
   save_dir = kwargs['save_dir']
-  if not os.path.exists(save_dir):
-    os.mkdir(save_dir) 
   project_name = kwargs['project_name']
+
+  # Adapt command line args
+  use_dd = 'dd' in levels
+  levels = list(reversed(sorted([l for l in levels if l in (0,1,2)])))
+  current_epoch_seconds = int(time.time())
+  rotating_seed = current_epoch_seconds%31556952
+  rng = np.random.RandomState(rotating_seed)
+  if noise_seed is None:
+    noise_seed = rng.randint(0, 100000000)
+  if dd_noise_seed is None:
+    dd_noise_seed = rng.randint(0, 100000000)
+
+  # Set up directories
+  if not os.path.exists(save_dir):
+    os.mkdir(save_dir)
+  project_name = f"{project_name}_{noise_seed:08d}_{dd_noise_seed:08d}"
   if os.path.exists(os.path.join(save_dir, project_name)):
     num_paths = len(glob(os.path.join(save_dir,f"{project_name}_*")))
     project_name = f"{project_name}_{num_paths:04d}"
   save_dir = os.path.join(save_dir, project_name)
   os.mkdir(save_dir)
-
-  # Adapt command line args
-  use_dd = 'dd' in levels
-  levels = list(reversed(sorted([l for l in levels if l in (0,1,2)])))
-  if noise_seed is None:
-    noise_seed = ... # TODO, implement random generation of noise_seed
-  if dd_noise_seed is None:
-    dd_noise_seed = ... # TODO, implement random generation of dd_noise_seed
 
   # Load Sampling Args
   sampling_conf = conf['sampling']['diffusion']
@@ -130,8 +140,9 @@ def run(*args, **kwargs):
       self.use_dd = use_dd
       self.sampling_conf = sampling_conf
       self.xfade_style = xfade_style
-      self.dd_noise = torch.randn([1, 2, audio.shape[-1]], device='cuda') # TODO, change to be based off dd_noise_seed
+      self.dd_noise_seed = dd_noise_seed
       self.dd_noise_style = dd_noise_style
+      self.dd_noise_step = dd_noise_step_size
 
   # Load Sampler
   sample_args = SamplingArgs()
@@ -192,11 +203,13 @@ def main():
   parser.add_argument('--context-audio', help='Provide the location of context audio', required=True, metavar='FILE', type=_path_exists)
   parser.add_argument('--save-dir', help='Name of directory for saved files', required=True, type=str)
   parser.add_argument('--levels', help='Levels to use for upsampling', default=[0,1,2,'dd'], type=list)
-  parser.add_argument('--noise-seed', help='Random seed to use for sampling base layer of Jukebox Diffusion', default=None, type=int)
-  parser.add_argument('--noise-style', help='How the random noise for generating base layer of Jukebox Diffusion progresses: random, constant, region', default='random', type=str)
   parser.add_argument('--project-name', help='Name of project', default='JBDiffusion', type=str)
+  parser.add_argument('--noise-seed', help='Random seed to use for sampling base layer of Jukebox Diffusion', default=None, type=int)
+  parser.add_argument('--noise-style', help='How the random noise for generating base layer of Jukebox Diffusion progresses: random, constant, region, walk', default='random', type=str)
   parser.add_argument('--dd-noise-seed', help='Random seed to use for sampling Dance Diffusion', default=None, type=int)
-  parser.add_argument('--dd-noise-style', help='How the random noise for generating in Dance Diffusion progresses: random, constant, region', default='random', type=str)
+  parser.add_argument('--dd-noise-style', help='How the random noise for generating in Dance Diffusion progresses: random, constant, region, walk', default='random', type=str)
+  parser.add_argument('--noise-step-size', help='How far to wander around init noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
+  parser.add_argument('--dd-noise-step-size', help='How far to wander around init DD noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
   # parser.add_argument('--lowest-level-pkl', help='Location of lowest level network pkl for use in sampling', default=None, metavar='FILE', type=_path_exists)
   # parser.add_argument('--middle-level-pkl', help='Location of middle level network pkl for use in sampling', default=None, metavar='FILE', type=_path_exists)
   # parser.add_argument('--highest-level-pkl', help='Location of highest level network pkl for use in sampling', default=None, metavar='FILE', type=_path_exists)

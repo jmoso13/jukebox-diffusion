@@ -533,18 +533,39 @@ def extend_dim(x: Tensor, dim: int):
     # e.g. if dim = 4: shape [b] => [b, 1, 1, 1],
     return x.view(*x.shape + (1,) * (dim - x.ndim))
 
-# TODOS
-def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random'):
+
+def custom_random_generator(seed):
+    """
+    Create a custom random number generator with the given seed.
+
+    Args:
+        seed (int): Random seed.
+
+    Returns:
+        torch.Generator: Custom random number generator.
+    """
+    generator = t.Generator()
+    generator.manual_seed(seed)
+    return generator
+
+
+def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random', noise_step_size=0.05):
+    rng = custom_random_generator(noise_seed)
     if style == 'random':
-        # Implement Noise Seed behavior
-        return t.randn([1, 64, num_window_shifts*base_tokens]).to(device)
+        return t.randn([1, 64, num_window_shifts*base_tokens], generator=rng).to(device)
     elif style == 'constant':
-        r_noise = t.randn([1, 64, base_tokens])
-        return t.cat([r_noise for s in range(num_window_shifts)], dim=2).to(device)
+        r_noise = t.randn([1, 64, base_tokens], generator=rng)
+        return t.cat([r_noise for _ in range(num_window_shifts)], dim=2).to(device)
     elif style == 'region':
-        # Implement random region walk
+        home_noise = t.randn([1, 64, base_tokens], generator=rng)
+        return t.cat([home_noise]+[home_noise+noise_step_size*t.randn([1, 64, base_tokens], generator=rng) for _ in range(num_window_shifts-1)], dim=2).to(device)
+    elif style == 'walk':
+        home_noise = t.randn([1, 64, base_tokens], generator=rng)
+        random_tensors = [home_noise] + [noise_step_size*t.randn([1, 64, base_tokens], generator=rng) for _ in range(num_window_shifts-1)]
+        cumulative_tensors = [t.sum(random_tensors[:i + 1]) for i in range(len(random_tensors))]
+        return t.cat(cumulative_tensors, dim=2).to(device)
     else:
-        raise Exception("Noise style must be either 'constant' or 'random'")
+        raise Exception("Noise style must be either 'constant', 'random', 'region', or 'walk'")
 
 
 class Sampler:
@@ -567,13 +588,16 @@ class Sampler:
         if self.use_dd:
             self.dd_base_samples = self.base_tokens*self.level_mults[self.levels[-1]]
             self.dd_xfade_samples = self.sampling_conf["dd"]["xfade_samples"]
-            dd_sample_size = self.dd_base_samples+self.dd_xfade_samples
-            dd_ckpt = self.sampling_conf["dd"]["ckpt_loc"]
-            self.dd_model = DDModel(sample_size=dd_sample_size, sr=self.sr, custom_ckpt_path=dd_ckpt)
+            self.self.dd_sample_size = self.dd_base_samples+self.dd_xfade_samples
+            self.dd_ckpt = self.sampling_conf["dd"]["ckpt_loc"]
+            self.dd_model = DDModel(sample_size=self.dd_sample_size, sr=self.sr, custom_ckpt_path=self.dd_ckpt)
             self.dd_steps = self.sampling_conf["dd"]["num_steps"]
             self.dd_init_strength = self.sampling_conf["dd"]["init_strength"]
-            self.dd_noise = sampling_args.dd_noise
+            self.dd_noise_rng = custom_random_generator(sampling_args.dd_noise_seed)
+            self.dd_noise = t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng)
+            self.dd_home_noise = self.dd_noise.clone()
             self.dd_noise_style = sampling_args.dd_noise_style
+            self.dd_noise_step = sampling_args.dd_noise_step
 
     def sample_level(self, step, steps, level_idx, noise, init):
         level = self.levels[level_idx]
@@ -629,7 +653,7 @@ class Sampler:
                 self.last_layer_0 = sample_audio
                 self.cur_sample += self.base_tokens*self.level_mults[level]
                 self.update_dd_noise()
-                return None
+            return None
         else:
             next_steps = level_mults[level]//level_mults[levels[level_idx+1]]
             print(f'next_steps: {next_steps}')
@@ -695,5 +719,15 @@ class Sampler:
         self.context_windows[level] = t.cat([*cur_context.chunk(self.context_mult, dim=1)[1:], new_audio_enc], dim=1)
 
     def update_dd_noise(self):
-        # TODO, implement updating of dd_noise based off of current noise/noise_style/random_generator
-        pass
+        if self.dd_noise_style == 'random':
+            self.dd_noise = t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng)
+        elif self.dd_noise_style == 'constant':
+            pass
+        elif self.dd_noise_style == 'region':
+            self.dd_noise = self.dd_home_noise + self.dd_noise_step*t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng)
+        elif self.dd_noise_style == 'walk':
+            self.dd_noise += self.dd_noise_step*t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng)
+        else:
+            raise Exception("DD noise style must be either 'constant', 'random', 'region', or 'walk'")
+
+        
