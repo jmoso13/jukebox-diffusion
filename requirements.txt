@@ -8,6 +8,7 @@ mpi4py>=3.0.0
 av==8
 git+https://github.com/jmoso13/a-unet.git@add_dilation
 git+https://github.com/jmoso13/audio-diffusion-pytorch.git@noise_pass
+torchmetrics==0.11.4
 pytorch-lightning==1.7
 wandb
 Pygments==2.14.0
