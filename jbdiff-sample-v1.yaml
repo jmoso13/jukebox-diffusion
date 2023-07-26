@@ -3,23 +3,23 @@ sampling:
             dd:
                   num_steps: 150
                   init_strength: 0.5
-                  ckpt_loc: "..."
+                  ckpt_loc: "/home/ubuntu/sampling_trials/dd_ckpts/epoch=2125-step=218000.ckpt"
                   xfade_samples: 1536
                   xfade_style: "linear"
             0:
                   num_steps: 4
                   embedding_strength: 1.3
                   init_strength: 0.0
-                  ckpt_loc: "..."
+                  ckpt_loc: "/home/ubuntu/jbdiff_checkpoints/jbdiff_2.ckpt/epoch=4938-step=400000.ckpt"
             1:
                   num_steps: 4
                   embedding_strength: 1.3
                   init_strength: 0.0
-                  ckpt_loc: "..."
+                  ckpt_loc: "/home/ubuntu/repo_trials/layer_1_ckpts/epoch=1404-step=455000.ckpt"
             2:
                   num_steps: 250
                   embedding_strength: 4.0
-                  ckpt_loc: "..."
+                  ckpt_loc: "/home/ubuntu/repo_trials/layer_0_ckpts/epoch=543-step=705000.ckpt"
 model:
       vqvae:
             batch_size: 32
