@@ -6,6 +6,7 @@ import numpy as np
 import math
 import jukebox.utils.dist_adapter as dist
 from torch.utils.data import Dataset
+from torch import Tensor
 from jukebox.utils.dist_utils import print_all
 from jukebox.utils.io import get_duration_sec, load_audio
 from jukebox.data.labels import Labeller
@@ -764,12 +765,12 @@ class Sampler:
         plt.savefig(mel_fn)
         plt.close()
 
-    def xfade(self, fade_out, fade_in, xfade_style=self.xfade_style):
+    def xfade(self, fade_out, fade_in):
         assert fade_out.shape[2] == fade_in.shape[2], "Fades are not the same size, investigate"
         num_samples = fade_out.shape[2]
-        if xfade_style == 'linear':
+        if self.xfade_style == 'linear':
             fade_weights = t.linspace(0.0, 1.0, num_samples, device=fade_out.device)
-        elif xfade_style == 'constant-power':
+        elif self.xfade_style == 'constant-power':
             fade_weights = torch.sin((math.pi / 2) * t.linspace(0.0, 1.0, num_samples, device=fade_out.device))
         new_fade_out = fade_out*(1 - fade_weights)
         new_fade_in = fade_in*fade_weights 
