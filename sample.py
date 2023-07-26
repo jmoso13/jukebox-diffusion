@@ -84,7 +84,7 @@ def run(*args, **kwargs):
   diffusion_models = dict()
   for level in levels:
     # Load VQ-VAEs
-    vqvae, _, _ = make_jb(audio_dir, level, batch_size, base_tokens, context_mult, aug_shift, num_workers, train=False)
+    vqvae, _, _ = make_jb(".", level, batch_size, base_tokens, context_mult, aug_shift, num_workers=12, train=False)
     # Load Diff Models
     diffusion_conf = conf['model']['diffusion'][level]
     diffusion_conf = parse_diff_conf(diffusion_conf)
