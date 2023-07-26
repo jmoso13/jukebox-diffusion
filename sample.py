@@ -1,10 +1,11 @@
 import os
 import argparse
-from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler, get_final_audio_container
+from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler, get_final_audio_container, combine_wav_files, combine_png_files, combine_video_with_audio
 import wave
 from glob import glob
 import numpy as np
 import time
+import torch as t
 
 #----------------------------------------------------------------------------
 
@@ -90,6 +91,8 @@ def run(*args, **kwargs):
     diffusion_conf['embedding_max_length'] = context_mult*base_tokens
     diffusion_models[level] = JBDiffusion(vqvae=vqvae, level=level, diffusion_kwargs=diffusion_conf).to('cpu')
     # Load ckpt state
+    diffusion_models[level].load_state_dict(t.load(sampling_conf[level]["ckpt_loc"])["state_dict"])
+    diffusion_models[level] = diffusion_models[level].requires_grad_(False).to("cpu")
 
   # Check that all are in eval
   for level in levels:
@@ -169,8 +172,11 @@ def run(*args, **kwargs):
   save_final_audio(final_audio, save_dir, sr)
 
   for level in levels:
-    # TODO save wav files and mel spectrograms
-    pass
+    combine_wav_files(save_dir, level)
+    fps = round(sr/base_tokens/level_mults[level], 3)
+    combine_png_files(save_dir, level, fps)
+    combine_video_with_audio(save_dir, level)
+
 
 #----------------------------------------------------------------------------
 
@@ -218,9 +224,6 @@ def main():
   parser.add_argument('--dd-noise-style', help='How the random noise for generating in Dance Diffusion progresses: random, constant, region, walk', default='random', type=str)
   parser.add_argument('--noise-step-size', help='How far to wander around init noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
   parser.add_argument('--dd-noise-step-size', help='How far to wander around init DD noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
-  # parser.add_argument('--lowest-level-pkl', help='Location of lowest level network pkl for use in sampling', default=None, metavar='FILE', type=_path_exists)
-  # parser.add_argument('--middle-level-pkl', help='Location of middle level network pkl for use in sampling', default=None, metavar='FILE', type=_path_exists)
-  # parser.add_argument('--highest-level-pkl', help='Location of highest level network pkl for use in sampling', default=None, metavar='FILE', type=_path_exists)
   args = parser.parse_args()
 
 

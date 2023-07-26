@@ -585,7 +585,7 @@ def combine_wav_files(save_dir, level):
     input_directory = os.path.join(save_dir, level)
 
     # Get a list of all .wav files in the input directory
-    wav_files = [file for file in os.listdir(input_directory) if file.endswith(".wav")]
+    wav_files = sorted([file for file in os.listdir(input_directory) if file.endswith(".wav")])
 
     # Create a list of input file paths
     input_files = [os.path.join(input_directory, file) for file in wav_files]
@@ -598,23 +598,40 @@ def combine_wav_files(save_dir, level):
     subprocess.run(ffmpeg_command)
 
 
-def combine_png_files(save_dir, level):
-    # TODO
+def combine_png_files(save_dir, level, fps):
     # Get input_direc
     input_directory = os.path.join(save_dir, level)
 
-    # Get a list of all .wav files in the input directory
-    # png_files = [file for file in os.listdir(input_directory) if file.endswith(".png")]
+    # Concat regex for pngs
+    all_pngs = os.path.join(input_directory, '*.png')
 
-    # # Create a list of input file paths
-    # input_files = [os.path.join(input_directory, file) for file in wav_files]
+    # Define output file loc
+    output_file = os.path.join(save_dir, f"{level}.mp4")
 
-    # # Define output file loc
-    # output_file = os.path.join(save_dir, f"{level}.wav")
+    # Use ffmpeg to concatenate the audio files
+    ffmpeg_command = ["ffmpeg", "-framerate", str(fps), "-pattern_type", "glob", "-i", f"'{all_pngs}'", "-vcodec", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-preset", "veryslow", output_file]
+    subprocess.run(ffmpeg_command)
 
-    # # Use ffmpeg to concatenate the audio files
-    # ffmpeg_command = ["ffmpeg", "-i", "concat:" + "|".join(input_files), "-c", "copy", output_file]
-    # subprocess.run(ffmpeg_command)
+
+def combine_video_with_audio(save_dir, level):
+    """
+    Combines an .mp4 video and .wav audio file into a single video with synchronized audio.
+    """
+    video_path = os.path.join(save_dir, f"{level}.mp4")
+    audio_path = os.path.join(save_dir, f"{level}.wav")
+    output_path = os.path.join(save_dir, f"{level}_combined.mp4")
+
+    ffmpeg_command = [
+        "ffmpeg",
+        "-i", video_path,
+        "-i", audio_path,
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-strict", "experimental",
+        output_path
+    ]
+
+    subprocess.run(ffmpeg_command)
 
 
 class Sampler:
