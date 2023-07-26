@@ -1,6 +1,6 @@
 import os
 import argparse
-from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler
+from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler, get_final_audio_container
 import wave
 from glob import glob
 import numpy as np
@@ -107,7 +107,7 @@ def run(*args, **kwargs):
   leftover_window = round(seconds_length*sr) - num_window_shifts*lowest_sample_window_length
   if leftover_window > 0:
     num_window_shifts += 1
-    pad = leftover_window
+    pad = lowest_sample_window_length - leftover_window
   else:
     pad = None
 
@@ -127,6 +127,9 @@ def run(*args, **kwargs):
 
   print(f'init_audio shape: {init_audio.shape}\ndivided by {num_window_shifts} == {init_audio.shape[1]/num_window_shifts}')
   print(f'noise shape: {noise.shape}\ndivided by {num_window_shifts} == {noise.shape[2]/num_window_shifts}')
+
+  # Final Audio Container
+  final_audio_container = get_final_audio_container(lowest_sample_window_length, num_window_shifts)
 
   # Define sampling args
   class SamplingArgs:
@@ -162,7 +165,12 @@ def run(*args, **kwargs):
                         )
     sampler.update_context_window(levels[0])
 
-  # TODO crop and save final audio file, collect and save all level wavs and spectrograms
+  final_audio = final_audio_container[:,:,:-pad]
+  save_final_audio(final_audio, save_dir, sr)
+
+  for level in levels:
+    # TODO save wav files and mel spectrograms
+    pass
 
 #----------------------------------------------------------------------------
 

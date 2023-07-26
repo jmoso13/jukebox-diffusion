@@ -28,6 +28,7 @@ import wandb
 import tqdm
 import yaml
 import importlib
+import subprocess
 
 
 class FilesAudioDataset(Dataset):
@@ -568,6 +569,54 @@ def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random', n
         raise Exception("Noise style must be either 'constant', 'random', 'region', or 'walk'")
 
 
+def get_final_audio_container(lowest_sample_window_length, num_window_shifts):
+    return t.zeros((1, 2, lowest_sample_window_length*num_window_shifts))
+
+
+def save_final_audio(final_audio, save_dir, sr):
+    final_audio = rearrange(final_audio, 'b t c -> c (b t)')
+    audio_fn = os.path.join(save_dir, f"final_audio.wav")
+    final_audio = final_audio.clamp(-1, 1).mul(32767).to(t.int16).cpu()
+    torchaudio.save(audio_fn, final_audio, sr)
+
+
+def combine_wav_files(save_dir, level):
+    # Get input_direc
+    input_directory = os.path.join(save_dir, level)
+
+    # Get a list of all .wav files in the input directory
+    wav_files = [file for file in os.listdir(input_directory) if file.endswith(".wav")]
+
+    # Create a list of input file paths
+    input_files = [os.path.join(input_directory, file) for file in wav_files]
+
+    # Define output file loc
+    output_file = os.path.join(save_dir, f"{level}.wav")
+
+    # Use ffmpeg to concatenate the audio files
+    ffmpeg_command = ["ffmpeg", "-i", "concat:" + "|".join(input_files), "-c", "copy", output_file]
+    subprocess.run(ffmpeg_command)
+
+
+def combine_png_files(save_dir, level):
+    # TODO
+    # Get input_direc
+    input_directory = os.path.join(save_dir, level)
+
+    # Get a list of all .wav files in the input directory
+    # png_files = [file for file in os.listdir(input_directory) if file.endswith(".png")]
+
+    # # Create a list of input file paths
+    # input_files = [os.path.join(input_directory, file) for file in wav_files]
+
+    # # Define output file loc
+    # output_file = os.path.join(save_dir, f"{level}.wav")
+
+    # # Use ffmpeg to concatenate the audio files
+    # ffmpeg_command = ["ffmpeg", "-i", "concat:" + "|".join(input_files), "-c", "copy", output_file]
+    # subprocess.run(ffmpeg_command)
+
+
 class Sampler:
     def __init__(self, cur_sample, diffusion_models, context_windows, final_audio_container, sampling_args):
         self.cur_sample = cur_sample
@@ -637,7 +686,7 @@ class Sampler:
                     padding = np.zeros((1,1,self.dd_xfade_samples))
                     dd_init = t.cat([padding, sample_audio], dim=2)
                 else:
-                    padding = self.last_layer_0[-self.dd_xfade_samples:]
+                    padding = self.last_layer_0[:,:,-self.dd_xfade_samples:]
                     dd_init = t.cat([padding, sample_audio], dim=2)
                 # Sample
                 dd_sample = self.dd_model.sample(dd_init, self.dd_steps, self.dd_init_strength, self.dd_noise)
