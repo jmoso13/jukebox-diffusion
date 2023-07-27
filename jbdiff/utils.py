@@ -30,7 +30,7 @@ import tqdm
 import yaml
 import importlib
 import subprocess
-from dd_utils import DDModel
+from jbdiff.dd_utils import DDModel
 
 
 class FilesAudioDataset(Dataset):
