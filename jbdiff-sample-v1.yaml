@@ -19,7 +19,7 @@ sampling:
             2:
                   num_steps: 250
                   embedding_strength: 4.0
-                  ckpt_loc: "/home/ubuntu/jbdiff_checkpoints/jbdiff_2.ckpt/epoch=4938-step=400000.ckpt"
+                  ckpt_loc: "/home/ubuntu/jbdiff_checkpoints/jbdiff_2.ckpt/epoch=4938-step=400000_vqvae_add.ckpt"
 model:
       vqvae:
             batch_size: 32

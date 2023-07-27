@@ -96,12 +96,12 @@ def run(*args, **kwargs):
 
   # Check that all are in eval
   for level in levels:
-    diffusion_models.eval()
-  for k,v in diffusion_models:
+    diffusion_models[level].eval()
+  for k,v in diffusion_models.items():
     assert not v.diffusion.training
     assert not v.vqvae.training
-    print(f"Level {k} VQVAE on device: {v.vqvae.device}")
-    print(f"Level {k} Diffusion Model on device: {v.diffusion.device}")
+    print(f"Level {k} VQVAE on device: {next(v.vqvae.parameters()).device}")
+    print(f"Level {k} Diffusion Model on device: {next(v.diffusion.parameters()).device}")
 
   # Setup for Sampling
   level_mults = {0:8, 1:32, 2:128}
