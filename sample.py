@@ -44,6 +44,8 @@ def run(*args, **kwargs):
       context_num_frames = wav_file.getnframes()
       context_sr = wav_file.getframerate()
       assert context_sr == sr, f"context wav file must be {sr} sample rate to work with JBDiffusion"
+  else:
+    context_num_frames = sr*seconds_length
   # Noise Params
   noise_seed = kwargs['noise_seed']
   noise_style = kwargs['noise_style'].lower()

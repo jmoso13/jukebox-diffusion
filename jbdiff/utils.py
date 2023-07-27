@@ -358,7 +358,10 @@ class JBDiffusion(pl.LightningModule):
         context_frames = context_mult*base_tokens*level_mult
         cutoff = context_frames if context_frames <= context_num_frames else context_num_frames
         offset = max(0, int(context_num_frames-context_frames))
-        data, _ = load_audio(context_audio, sr=sr, offset=offset, duration=cutoff)
+        if context is not None:
+            data, _ = load_audio(context_audio, sr=sr, offset=offset, duration=cutoff)
+        else:
+            data = np.zeros((2, context_frames))
         context = np.zeros((data.shape[0], context_frames))
         context[:, -cutoff:] += context_data
         context = context.T
