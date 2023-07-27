@@ -363,7 +363,7 @@ class JBDiffusion(pl.LightningModule):
         else:
             data = np.zeros((2, context_frames))
         context = np.zeros((data.shape[0], context_frames))
-        context[:, -cutoff:] += context_data
+        context[:, -cutoff:] += data
         context = context.T
         context = t.tensor(np.expand_dims(context, axis=0)).to('cuda', non_blocking=True).detach()
         context_z, context_q = batch_preprocess(context, self.vqvae, self.level)
