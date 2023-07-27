@@ -676,6 +676,7 @@ class Sampler:
 
     def sample_level(self, step, steps, level_idx, base_noise, base_init):
         level = self.levels[level_idx]
+        print(f"sampling level {level} out of levels {self.levels}\nsampling step {step} out of {steps} steps on this level")
         # To GPU
         self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
         # Cut up and encode noise & init
@@ -745,7 +746,6 @@ class Sampler:
     def save_sample_audio(self, sample_audio, level):
         # Reshape Audio and Save
         audio = rearrange(sample_audio, 'b t c -> c (b t)')
-        print('audio device: ', audio.device)
         level_loc = os.path.join(self.save_dir, str(level))
         if not os.path.exists(level_loc):
             os.mkdir(level_loc)
@@ -758,9 +758,9 @@ class Sampler:
             sample_rate=self.sr,
             n_mels=16
         )
-        print('mel_spectrogram device: ', mel_spectrogram.device)
         # Compute the mel spectrogram
-        mel_spec = mel_spectrogram(audio)
+        spec_audio = audio.to('cpu')
+        mel_spec = mel_spectrogram(spec_audio)
         # Convert the power spectrogram to decibels
         mel_spec_db = transforms.AmplitudeToDB()(mel_spec)
         # Convert the spectrogram tensor to a NumPy array for visualization
