@@ -313,7 +313,7 @@ class JBDiffusion(pl.LightningModule):
         self.log_dict(log_dict, prog_bar=True, on_step=True)
         return loss
 
-    def sample(noise, num_steps, init, init_strength, context, context_strength):
+    def sample(self, noise, num_steps, init, init_strength, context, context_strength):
         if init is not None:
             start_step = int(init_strength*num_steps)
             sigmas = self.diffusion.sampler.schedule(num_steps + 1, device='cuda')
@@ -374,6 +374,10 @@ class JBDiffusion(pl.LightningModule):
 
     def encode(self, audio):
         return batch_preprocess(audio, self.vqvae, self.level)
+
+    def decode(self, audio_q)
+        decoded_audio, _, _ = batch_postprocess(audio_q, self.vqvae, self.level)
+        return rearrange(decoded_audio, "b c t -> b t c")
 
     # def on_before_zero_grad(self, *args, **kwargs):
     #     decay = 0.95 if self.current_epoch < 25 else self.ema_decay
@@ -670,18 +674,18 @@ class Sampler:
             self.dd_noise_style = sampling_args.dd_noise_style
             self.dd_noise_step = sampling_args.dd_noise_step
 
-    def sample_level(self, step, steps, level_idx, noise, init):
+    def sample_level(self, step, steps, level_idx, base_noise, base_init):
         level = self.levels[level_idx]
         # To GPU
         self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
         # Cut up and encode noise & init
-        cur_noise = noise.chunk(steps, dim=2)[step]
+        cur_noise = base_noise.chunk(steps, dim=2)[step]
         if level < 2:
             _, noise_enc = self.diffusion_models[level].encode(cur_noise)
         else:
             noise_enc = cur_noise
-        if init is not None:
-            cur_init = init.chunk(steps, dim=2)[step]
+        if base_init is not None:
+            cur_init = base_init.chunk(steps, dim=2)[step]
             _, init_enc = self.diffusion_models[level].encode(cur_init)
         else:
             init_enc = None
@@ -692,11 +696,12 @@ class Sampler:
         context = self.context_windows[level]
         # Sample
         sample, sample_audio = self.diffusion_models[level].sample(noise=noise_enc, 
-                                                              num_steps=num_steps, 
-                                                              init=init_enc, 
-                                                              init_strength=init_strength, 
-                                                              context=context, 
-                                                              context_strength=embedding_strength)
+                                                                  num_steps=num_steps, 
+                                                                  init=init_enc, 
+                                                                  init_strength=init_strength, 
+                                                                  context=context, 
+                                                                  context_strength=embedding_strength
+                                                                  )
         self.diffusion_models[level] = self.diffusion_models[level].to('cpu')
         self.save_sample_audio(sample_audio, level)
 

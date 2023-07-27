@@ -1,6 +1,6 @@
 import os
 import argparse
-from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler, get_final_audio_container, combine_wav_files, combine_png_files, combine_video_with_audio
+from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler, get_final_audio_container, save_final_audio, combine_wav_files, combine_png_files, combine_video_with_audio
 import wave
 from glob import glob
 import numpy as np
@@ -46,6 +46,7 @@ def run(*args, **kwargs):
       assert context_sr == sr, f"context wav file must be {sr} sample rate to work with JBDiffusion"
   else:
     context_num_frames = sr*seconds_length
+    context_sr = sr
   # Noise Params
   noise_seed = kwargs['noise_seed']
   noise_style = kwargs['noise_style'].lower()
@@ -165,8 +166,8 @@ def run(*args, **kwargs):
     sampler.sample_level( step=shift, 
                           steps=num_window_shifts, 
                           level_idx=0, 
-                          noise=noise, 
-                          init=init_audio
+                          base_noise=noise, 
+                          base_init=init_audio
                         )
     sampler.update_context_window(levels[0])
 
