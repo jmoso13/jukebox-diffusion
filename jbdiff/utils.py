@@ -567,7 +567,7 @@ def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random', n
     elif style == 'walk':
         home_noise = t.randn([1, 64, base_tokens], generator=rng)
         random_tensors = [home_noise] + [noise_step_size*t.randn([1, 64, base_tokens], generator=rng) for _ in range(num_window_shifts-1)]
-        cumulative_tensors = [t.sum(random_tensors[:i + 1]) for i in range(len(random_tensors))]
+        cumulative_tensors = [sum(random_tensors[:i + 1]) for i in range(len(random_tensors))]
         return t.cat(cumulative_tensors, dim=2).to(device)
     else:
         raise Exception("Noise style must be either 'constant', 'random', 'region', or 'walk'")
@@ -658,7 +658,7 @@ class Sampler:
         if self.use_dd:
             self.dd_base_samples = self.base_tokens*self.level_mults[self.levels[-1]]
             self.dd_xfade_samples = self.sampling_conf["dd"]["xfade_samples"]
-            self.self.dd_sample_size = self.dd_base_samples+self.dd_xfade_samples
+            self.dd_sample_size = self.dd_base_samples+self.dd_xfade_samples
             self.dd_ckpt = self.sampling_conf["dd"]["ckpt_loc"]
             self.dd_model = DDModel(sample_size=self.dd_sample_size, sr=self.sr, custom_ckpt_path=self.dd_ckpt)
             self.dd_steps = self.sampling_conf["dd"]["num_steps"]

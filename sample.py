@@ -129,8 +129,8 @@ def run(*args, **kwargs):
   # Load Init Audio and Init Final Audio Container
   if init_audio is not None:
     init_audio = load_aud(init_audio, sr, 0, init_num_frames, pad=pad)
-
-  print(f'init_audio shape: {init_audio.shape}\ndivided by {num_window_shifts} == {init_audio.shape[1]/num_window_shifts}')
+    print(f'init_audio shape: {init_audio.shape}\ndivided by {num_window_shifts} == {init_audio.shape[1]/num_window_shifts}')
+  
   print(f'noise shape: {noise.shape}\ndivided by {num_window_shifts} == {noise.shape[2]/num_window_shifts}')
 
   # Final Audio Container
@@ -147,7 +147,7 @@ def run(*args, **kwargs):
       self.sr = sr
       self.use_dd = use_dd
       self.sampling_conf = sampling_conf
-      self.xfade_style = xfade_style
+      self.xfade_style = sampling_conf['dd']['xfade_style']
       self.dd_noise_seed = dd_noise_seed
       self.dd_noise_style = dd_noise_style
       self.dd_noise_step = dd_noise_step_size
