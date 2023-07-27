@@ -324,7 +324,7 @@ class JBDiffusion(pl.LightningModule):
             print(sigmas)
             sigmas_batch = extend_dim(sigmas, dim=noise.ndim + 1)
             print('sigmas_batch shape: ', sigmas_batch.shape)
-            alphas, betas = sampler.get_alpha_beta(sigmas_batch)
+            alphas, betas = self.diffusion.sampler.get_alpha_beta(sigmas_batch)
             alpha, beta = alphas[0], betas[0]
             print('alpha: ', alpha, "\nbeta: ", beta)
             x_noisy = alpha*init + beta*noise
