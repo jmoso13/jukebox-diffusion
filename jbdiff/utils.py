@@ -745,7 +745,7 @@ class Sampler:
     def save_sample_audio(self, sample_audio, level):
         # Reshape Audio and Save
         audio = rearrange(sample_audio, 'b t c -> c (b t)')
-        level_loc = os.path.join(self.save_dir, level)
+        level_loc = os.path.join(self.save_dir, str(level))
         if not os.path.exists(level_loc):
             os.mkdir(level_loc)
         audio_fn = os.path.join(level_loc, f"{self.cur_sample:09d}.wav")
