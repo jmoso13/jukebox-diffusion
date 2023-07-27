@@ -732,7 +732,7 @@ class Sampler:
                 self.update_dd_noise()
             return None
         else:
-            next_steps = self.level_mults[level]//self.level_mults[levels[level_idx+1]]
+            next_steps = self.level_mults[level]//self.level_mults[self.levels[level_idx+1]]
             for next_step in range(next_steps):
                 # Sample next level... 
                 # TODO: create version to sample using traditional diffusion rather than upsampling trick
@@ -753,11 +753,11 @@ class Sampler:
         torchaudio.save(audio_fn, final_audio, self.sr)
 
         # Create a MelSpectrogram
-        hop_length = round((self.base_tokens*self.level_mults[level])/(.025*self.sr))
+        # hop_length = round((self.base_tokens*self.level_mults[level])/(.025*self.sr))
         mel_spectrogram = transforms.MelSpectrogram(
             sample_rate=self.sr,
             n_mels=16,
-            hop_length=hop_length
+            hop_length=512
         )
         # Compute the mel spectrogram
         spec_audio = audio.to('cpu')
