@@ -375,7 +375,7 @@ class JBDiffusion(pl.LightningModule):
     def encode(self, audio):
         return batch_preprocess(audio, self.vqvae, self.level)
 
-    def decode(self, audio_q)
+    def decode(self, audio_q):
         decoded_audio, _, _ = batch_postprocess(audio_q, self.vqvae, self.level)
         return rearrange(decoded_audio, "b c t -> b t c")
 
