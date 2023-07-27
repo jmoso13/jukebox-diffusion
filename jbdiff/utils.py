@@ -737,7 +737,7 @@ class Sampler:
                 # Sample next level... 
                 # TODO: create version to sample using traditional diffusion rather than upsampling trick
                 # Using noise_style either provide frozen sampled noise or newly sampled noise every iter for each level
-                self.sample_level(next_step, next_steps, level_idx+1, noise=sample_audio, init=sample_audio)
+                self.sample_level(next_step, next_steps, level_idx+1, base_noise=sample_audio, base_init=sample_audio)
                 self.update_context_window(self.levels[level_idx+1])
                 print('updating context_window at current level for next sampling step, grabbing from finished audio')
             return None
