@@ -745,6 +745,7 @@ class Sampler:
     def save_sample_audio(self, sample_audio, level):
         # Reshape Audio and Save
         audio = rearrange(sample_audio, 'b t c -> c (b t)')
+        print('audio device: ', audio.device)
         level_loc = os.path.join(self.save_dir, str(level))
         if not os.path.exists(level_loc):
             os.mkdir(level_loc)
@@ -757,6 +758,7 @@ class Sampler:
             sample_rate=self.sr,
             n_mels=16
         )
+        print('mel_spectrogram device: ', mel_spectrogram.device)
         # Compute the mel spectrogram
         mel_spec = mel_spectrogram(audio)
         # Convert the power spectrogram to decibels
