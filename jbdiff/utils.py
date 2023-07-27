@@ -353,7 +353,7 @@ class JBDiffusion(pl.LightningModule):
 
             return sample, sample_audio
 
-    def get_init_context(context_audio_file, level_mults, context_num_frames, base_tokens, context_mult, sr):
+    def get_init_context(self, context_audio_file, level_mults, context_num_frames, base_tokens, context_mult, sr):
         level_mult = level_mults[self.level]
         context_frames = context_mult*base_tokens*level_mult
         cutoff = context_frames if context_frames <= context_num_frames else context_num_frames
@@ -371,7 +371,7 @@ class JBDiffusion(pl.LightningModule):
 
         return context_q
 
-    def encode(audio):
+    def encode(self, audio):
         return batch_preprocess(audio, self.vqvae, self.level)
 
     # def on_before_zero_grad(self, *args, **kwargs):
