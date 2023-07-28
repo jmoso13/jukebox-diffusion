@@ -574,7 +574,7 @@ def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random', n
 
 
 def get_final_audio_container(lowest_sample_window_length, num_window_shifts):
-    return t.zeros((1, 2, lowest_sample_window_length*num_window_shifts))
+    return t.zeros((1, 2, lowest_sample_window_length*num_window_shifts)).to(device)
 
 
 def save_final_audio(final_audio, save_dir, sr):
