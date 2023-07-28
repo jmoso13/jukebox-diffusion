@@ -787,7 +787,8 @@ class Sampler:
             fade_weights = torch.sin((math.pi / 2) * t.linspace(0.0, 1.0, num_samples, device=fade_out.device))
         new_fade_out = fade_out*(1 - fade_weights)
         new_fade_in = fade_in_match*fade_weights
-        crossfaded_audio = new_fade_in + new_fade_out       
+        crossfaded_audio = new_fade_in + new_fade_out
+        return crossfaded_audio
 
     def update_context_window(self, level):
         cur_context = self.context_windows[level]
