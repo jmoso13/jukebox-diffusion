@@ -712,7 +712,7 @@ class Sampler:
             if self.use_dd:
                 sample_audio = rearrange(sample_audio, "b t c -> b c t")
                 if self.cur_sample == 0:
-                    padding = np.zeros((1,1,self.dd_xfade_samples))
+                    padding = t.zeros((1,1,self.dd_xfade_samples))
                     dd_init = t.cat([padding, sample_audio], dim=2)
                 else:
                     padding = self.last_layer_0[:,:,-self.dd_xfade_samples:]
