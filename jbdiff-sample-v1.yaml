@@ -2,12 +2,12 @@ sampling:
       diffusion:
             dd:
                   num_steps: 150
-                  init_strength: 0.5
+                  init_strength: 0.23
                   ckpt_loc: "/home/ubuntu/sampling_trials/dd_ckpts/epoch=2125-step=218000.ckpt"
                   xfade_samples: 1536
                   xfade_style: "linear"
             0:
-                  num_steps: 4
+                  num_steps: 50
                   embedding_strength: 1.3
                   init_strength: 0.0
                   ckpt_loc: "/home/ubuntu/repo_trials/layer_0_ckpts/epoch=543-step=705000.ckpt"
