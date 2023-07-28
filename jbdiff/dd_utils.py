@@ -107,7 +107,7 @@ class DDModel:
     self.model = self.model.to('cuda')
     generated = resample(self.model.diffusion_ema, padded_audio, padded_noise, steps, sampler_type=self.sampler_type, noise_level=noise_level)
     self.model = self.model.to('cpu')
-    generated = generated[:,:,:-pad]
+    generated = generated[:,:,:-pad_length]
     print('og stereo_audio shape: ', stereo_audio.shape, 'generated shape: ', generated.shape)
     print('dd_sample_size: ', self.sample_size)
 
