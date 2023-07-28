@@ -574,7 +574,7 @@ def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random', n
 
 
 def get_final_audio_container(lowest_sample_window_length, num_window_shifts):
-    return t.zeros((1, 2, lowest_sample_window_length*num_window_shifts)).to(device)
+    return t.zeros((1, 2, lowest_sample_window_length*num_window_shifts))
 
 
 def save_final_audio(final_audio, save_dir, sr):
@@ -779,13 +779,14 @@ class Sampler:
 
     def xfade(self, fade_out, fade_in):
         assert fade_out.shape[2] == fade_in.shape[2], "Fades are not the same size, investigate"
+        fade_in_match = fade_in.clone().to(fade_out.device)
         num_samples = fade_out.shape[2]
         if self.xfade_style == 'linear':
             fade_weights = t.linspace(0.0, 1.0, num_samples, device=fade_out.device)
         elif self.xfade_style == 'constant-power':
             fade_weights = torch.sin((math.pi / 2) * t.linspace(0.0, 1.0, num_samples, device=fade_out.device))
         new_fade_out = fade_out*(1 - fade_weights)
-        new_fade_in = fade_in*fade_weights 
+        new_fade_in = fade_in_match*fade_weights
         crossfaded_audio = new_fade_in + new_fade_out       
 
     def update_context_window(self, level):
