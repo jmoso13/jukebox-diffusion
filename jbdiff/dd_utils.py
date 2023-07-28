@@ -92,7 +92,7 @@ class DDModel:
     self.sampler_type = sampler_type
     self.eta = 0
 
-  def sample(audio_sample, steps, init_strength, noise):
+  def sample(self, audio_sample, steps, init_strength, noise):
     noise_level = 1.0-init_strength
     stereo_audio = self.augs(audio_sample).unsqueeze(0)
     self.model = self.model.to('cuda')
