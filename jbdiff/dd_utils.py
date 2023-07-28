@@ -93,11 +93,20 @@ class DDModel:
     self.eta = 0
 
   def sample(self, audio_sample, steps, init_strength, noise):
+    # TODO: pass dd sample size as an arg
+    og_dd_sample_size = 65536
     noise_level = 1.0-init_strength
     stereo_audio = self.augs(audio_sample.squeeze(0)).unsqueeze(0)
-    print('stereo_audio shape: ', stereo_audio.shape, 'noise_shape: ', noise.shape)
+    assert stereo_audio.shape[2] == noise.shape[2]
+    pad_length = og_dd_sample_size - stereo_audio.shape[2]
+    pad = torch.zeros((1, 2, pad_length)).to('cuda')
+    padded_audio = torch.cat([stereo_audio, pad], dim=2)
+    padded_noise = torch.cat([noise, pad], dim=2)
+    print('padded_audio shape: ', padded_audio.shape, 'padded_noise_shape: ', padded_noise.shape)
     self.model = self.model.to('cuda')
-    generated = resample(self.model.diffusion_ema, stereo_audio, noise, steps, sampler_type=self.sampler_type, noise_level=noise_level)
+    generated = resample(self.model.diffusion_ema, padded_audio, padded_noise, steps, sampler_type=self.sampler_type, noise_level=noise_level)
     self.model = self.model.to('cpu')
+    generated = generated[:,:,:-pad]
+    print('og stereo_audio shape: ', stereo_audio.shape, 'generated shape: ', generated.shape)
 
     return generated
