@@ -51,10 +51,6 @@ def resample(model_fn, audio, noise, steps=100, sampler_type="v-ddim", noise_lev
     step_list = step_list[step_list < noise_level]
 
     alpha, sigma = t_to_alpha_sigma(step_list[-1])
-    print('audio: ', audio.device)
-    print('noise: ', noise.device)
-    print('alpha: ', alpha.device)
-    print('sigma: ', sigma.device)
     noised = noise
     noised = audio * alpha + noised * sigma
     noise_sample = noised
