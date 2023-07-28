@@ -322,6 +322,7 @@ class JBDiffusion(pl.LightningModule):
             sigmas = sigmas[start_step:]
             print('cut sigmas shape: ', sigmas.shape)
             print(sigmas)
+            sigmas = repeat(sigmas, "i -> i b", b=1)
             sigmas_batch = extend_dim(sigmas, dim=noise.ndim + 1)
             print('sigmas_batch shape: ', sigmas_batch.shape)
             alphas, betas = self.diffusion.sampler.get_alpha_beta(sigmas_batch)
