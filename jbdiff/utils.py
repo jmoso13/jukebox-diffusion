@@ -682,7 +682,7 @@ class Sampler:
         self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
         # Cut up and encode noise & init
         cur_noise = base_noise.chunk(steps, dim=2)[step]
-        print('base_noise shape: ', base_noise.shape, 'cur_noise shape: ', cur_noise_shape)
+        print('base_noise shape: ', base_noise.shape, 'cur_noise shape: ', cur_noise.shape)
         if level < 2:
             _, noise_enc = self.diffusion_models[level].encode(cur_noise)
             print('level is less than 2')
@@ -695,7 +695,7 @@ class Sampler:
             cur_init = base_init.chunk(steps, dim=2)[step]
             _, init_enc = self.diffusion_models[level].encode(cur_init)
             print('base init is not None')
-            print('cur_init shape: ', cur_init_shape, 'init_enc shape: ', init_enc.shape)
+            print('cur_init shape: ', cur_init.shape, 'init_enc shape: ', init_enc.shape)
         else:
             init_enc = None
         # Grab hps from sampling conf
