@@ -578,7 +578,7 @@ def get_final_audio_container(lowest_sample_window_length, num_window_shifts):
 
 
 def save_final_audio(final_audio, save_dir, sr):
-    final_audio = rearrange(final_audio, 'b t c -> c (b t)')
+    final_audio = rearrange(final_audio, 'b c t -> c (b t)')
     audio_fn = os.path.join(save_dir, f"final_audio.wav")
     final_audio = final_audio.clamp(-1, 1).mul(32767).to(t.int16).cpu()
     torchaudio.save(audio_fn, final_audio, sr)
@@ -586,7 +586,7 @@ def save_final_audio(final_audio, save_dir, sr):
 
 def combine_wav_files(save_dir, level):
     # Get input_direc
-    input_directory = os.path.join(save_dir, level)
+    input_directory = os.path.join(save_dir, str(level))
 
     # Get a list of all .wav files in the input directory
     wav_files = sorted([file for file in os.listdir(input_directory) if file.endswith(".wav")])
@@ -597,14 +597,23 @@ def combine_wav_files(save_dir, level):
     # Define output file loc
     output_file = os.path.join(save_dir, f"{level}.wav")
 
-    # Use ffmpeg to concatenate the audio files
-    ffmpeg_command = ["ffmpeg", "-i", "concat:" + "|".join(input_files), "-c", "copy", output_file]
-    subprocess.run(ffmpeg_command)
+    # Create a text file containing the list of input WAV files
+    with open(os.path.join(input_directory, "input.txt"), "w") as f:
+        for file in input_files:
+            f.write(f"file '{file}'\n")
+
+    # Call FFmpeg to concatenate the WAV files using the concat demuxer
+    ffmpeg_cmd = [
+        "ffmpeg",
+        "-f", "concat", "-safe", "0", "-i", os.path.join(input_directory, "input.txt"),
+        "-c", "copy", output_file
+    ]
+    subprocess.run(ffmpeg_cmd)
 
 
 def combine_png_files(save_dir, level, fps):
     # Get input_direc
-    input_directory = os.path.join(save_dir, level)
+    input_directory = os.path.join(save_dir, str(level))
 
     # Concat regex for pngs
     all_pngs = os.path.join(input_directory, '*.png')
@@ -613,7 +622,7 @@ def combine_png_files(save_dir, level, fps):
     output_file = os.path.join(save_dir, f"{level}.mp4")
 
     # Use ffmpeg to concatenate the audio files
-    ffmpeg_command = ["ffmpeg", "-framerate", str(fps), "-pattern_type", "glob", "-i", f"'{all_pngs}'", "-vcodec", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-preset", "veryslow", output_file]
+    ffmpeg_command = ["ffmpeg", "-framerate", str(fps), "-pattern_type", "glob", "-i", f"{all_pngs}", "-vcodec", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-preset", "veryslow", output_file]
     subprocess.run(ffmpeg_command)
 
 
@@ -671,7 +680,7 @@ class Sampler:
 
     def sample_level(self, step, steps, level_idx, base_noise, base_init):
         level = self.levels[level_idx]
-        print(f"sampling level {level} out of levels {self.levels}\nsampling step {step} out of {steps} steps on this level")
+        print(f"sampling level {level} out of levels {self.levels}\nsampling step {step+1} out of {steps} steps on this level")
         # To GPU
         self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
         # Cut up and encode noise & init

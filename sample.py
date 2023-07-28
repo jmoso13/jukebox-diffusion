@@ -171,7 +171,10 @@ def run(*args, **kwargs):
                         )
     sampler.update_context_window(levels[0])
 
-  final_audio = final_audio_container[:,:,:-pad]
+  if pad is not None:
+    final_audio = sampler.final_audio_container[:,:,:-pad]
+  else:
+    final_audio = sampler.final_audio_container.clone()
   save_final_audio(final_audio, save_dir, sr)
 
   for level in levels:
