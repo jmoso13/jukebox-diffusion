@@ -181,7 +181,7 @@ def run(*args, **kwargs):
     combine_wav_files(save_dir, level)
     fps = round(sr/base_tokens/level_mults[level], 3)
     combine_png_files(save_dir, level, fps)
-    combine_video_with_audio(save_dir, level)
+    # combine_video_with_audio(save_dir, level)
 
 
 #----------------------------------------------------------------------------
