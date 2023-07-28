@@ -46,7 +46,7 @@ def alpha_sigma_to_t(alpha, sigma):
 def resample(model_fn, audio, noise, steps=100, sampler_type="v-ddim", noise_level = 1.0):
   #Noise the input
   if sampler_type.startswith("v-"):
-    t = torch.linspace(0, 1, steps + 1, device=device)
+    t = torch.linspace(0, 1, steps + 1, device='cuda')
     step_list = get_crash_schedule(t)
     step_list = step_list[step_list < noise_level]
 
