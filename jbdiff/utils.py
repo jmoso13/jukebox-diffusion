@@ -702,13 +702,12 @@ class Sampler:
         num_steps = self.sampling_conf[level]['num_steps']
         init_strength = self.sampling_conf[level]['init_strength']
         embedding_strength = self.sampling_conf[level]['embedding_strength']
-        context = self.context_windows[level]
         # Sample
         sample, sample_audio = self.diffusion_models[level].sample(noise=noise_enc, 
                                                                   num_steps=num_steps, 
                                                                   init=init_enc, 
                                                                   init_strength=init_strength, 
-                                                                  context=context, 
+                                                                  context=self.context_windows[level], 
                                                                   context_strength=embedding_strength
                                                                   )
         self.diffusion_models[level] = self.diffusion_models[level].to('cpu')
