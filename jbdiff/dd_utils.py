@@ -77,7 +77,8 @@ class DDModel:
       pass
 
     args = Object()
-    args.sample_size = self.sample_size
+    # TODO update arg to pass dd sample size
+    args.sample_size = 65536
     args.sample_rate = self.sample_rate
     args.latent_dim = self.latent_dim
     
@@ -108,5 +109,6 @@ class DDModel:
     self.model = self.model.to('cpu')
     generated = generated[:,:,:-pad]
     print('og stereo_audio shape: ', stereo_audio.shape, 'generated shape: ', generated.shape)
+    print('dd_sample_size: ', self.sample_size)
 
     return generated
