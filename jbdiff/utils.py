@@ -317,17 +317,11 @@ class JBDiffusion(pl.LightningModule):
         if init is not None:
             start_step = int(init_strength*num_steps)
             sigmas = self.diffusion.sampler.schedule(num_steps + 1, device='cuda')
-            print('OG sigmas shape: ', sigmas.shape)
-            print(sigmas)
             sigmas = sigmas[start_step:]
-            print('cut sigmas shape: ', sigmas.shape)
-            print(sigmas)
             sigmas = repeat(sigmas, "i -> i b", b=1)
             sigmas_batch = extend_dim(sigmas, dim=noise.ndim + 1)
-            print('sigmas_batch shape: ', sigmas_batch.shape)
             alphas, betas = self.diffusion.sampler.get_alpha_beta(sigmas_batch)
             alpha, beta = alphas[0], betas[0]
-            print('alpha: ', alpha, "\nbeta: ", beta)
             x_noisy = alpha*init + beta*noise
             progress_bar = tqdm.tqdm(range(num_steps-start_step), disable=False)
 
@@ -682,7 +676,6 @@ class Sampler:
         self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
         # Cut up and encode noise & init
         cur_noise = base_noise.chunk(steps, dim=1)[step]
-        print('base_noise shape: ', base_noise.shape, 'cur_noise shape: ', cur_noise.shape)
         if level < 2:
             _, noise_enc = self.diffusion_models[level].encode(cur_noise)
             print('level is less than 2')
@@ -801,19 +794,17 @@ class Sampler:
         new_audio = self.final_audio_container[:,:,self.cur_sample-window_shift_length:self.cur_sample]
         new_audio = rearrange(new_audio, "b c t -> b t c")
         _, new_audio_enc = self.diffusion_models[level].encode(new_audio)
-        new_audio_enc = rearrange(new_audio_enc, "b c t -> b t c")
+        new_audio_enc = rearrange(new_audio_enc, "b c t -> b t c").to(device)
         self.context_windows[level] = t.cat([*cur_context.chunk(self.context_mult, dim=1)[1:], new_audio_enc], dim=1)
 
     def update_dd_noise(self):
         if self.dd_noise_style == 'random':
-            self.dd_noise = t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng)
+            self.dd_noise = t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng).to(device)
         elif self.dd_noise_style == 'constant':
             pass
         elif self.dd_noise_style == 'region':
-            self.dd_noise = self.dd_home_noise + self.dd_noise_step*t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng)
+            self.dd_noise = self.dd_home_noise + self.dd_noise_step*t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng).to(device)
         elif self.dd_noise_style == 'walk':
-            self.dd_noise += self.dd_noise_step*t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng)
+            self.dd_noise += self.dd_noise_step*t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng).to(device)
         else:
             raise Exception("DD noise style must be either 'constant', 'random', 'region', or 'walk'")
-
-        

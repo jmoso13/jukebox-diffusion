@@ -82,7 +82,7 @@ class DDModel:
     args.sample_rate = self.sample_rate
     args.latent_dim = self.latent_dim
     
-    print("Creating the model...")
+    print("Creating the Dance Diffusion model...")
     self.model = DiffusionUncond(args)
     self.model.load_state_dict(torch.load(self.ckpt_path)["state_dict"])
     self.model = self.model.requires_grad_(False).to("cpu")
@@ -103,12 +103,9 @@ class DDModel:
     pad = torch.zeros((1, 2, pad_length)).to('cuda')
     padded_audio = torch.cat([stereo_audio, pad], dim=2)
     padded_noise = torch.cat([noise, pad], dim=2)
-    print('padded_audio shape: ', padded_audio.shape, 'padded_noise_shape: ', padded_noise.shape)
     self.model = self.model.to('cuda')
     generated = resample(self.model.diffusion_ema, padded_audio, padded_noise, steps, sampler_type=self.sampler_type, noise_level=noise_level)
     self.model = self.model.to('cpu')
     generated = generated[:,:,:-pad_length]
-    print('og stereo_audio shape: ', stereo_audio.shape, 'generated shape: ', generated.shape)
-    print('dd_sample_size: ', self.sample_size)
 
     return generated
