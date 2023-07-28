@@ -681,7 +681,7 @@ class Sampler:
         # To GPU
         self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
         # Cut up and encode noise & init
-        cur_noise = base_noise.chunk(steps, dim=2)[step]
+        cur_noise = base_noise.chunk(steps, dim=1)[step]
         print('base_noise shape: ', base_noise.shape, 'cur_noise shape: ', cur_noise.shape)
         if level < 2:
             _, noise_enc = self.diffusion_models[level].encode(cur_noise)
@@ -692,7 +692,7 @@ class Sampler:
             print('level is 2')
             print('noise_enc shape: ', noise_enc.shape)
         if base_init is not None:
-            cur_init = base_init.chunk(steps, dim=2)[step]
+            cur_init = base_init.chunk(steps, dim=1)[step]
             _, init_enc = self.diffusion_models[level].encode(cur_init)
             print('base init is not None')
             print('cur_init shape: ', cur_init.shape, 'init_enc shape: ', init_enc.shape)
@@ -718,7 +718,7 @@ class Sampler:
             if self.use_dd:
                 sample_audio = rearrange(sample_audio, "b t c -> b c t")
                 if self.cur_sample == 0:
-                    padding = t.zeros((1,1,self.dd_xfade_samples))
+                    padding = t.zeros((1,1,self.dd_xfade_samples)).to('cuda')
                     dd_init = t.cat([padding, sample_audio], dim=2)
                 else:
                     padding = self.last_layer_0[:,:,-self.dd_xfade_samples:]
