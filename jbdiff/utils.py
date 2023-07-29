@@ -797,7 +797,7 @@ class Sampler:
         if self.xfade_style == 'linear':
             fade_weights = t.linspace(0.0, 1.0, num_samples, device=fade_out.device)
         elif self.xfade_style == 'constant-power':
-            fade_weights = torch.sin((math.pi / 2) * t.linspace(0.0, 1.0, num_samples, device=fade_out.device))
+            fade_weights = t.sin((math.pi / 2) * t.linspace(0.0, 1.0, num_samples, device=fade_out.device))
         new_fade_out = fade_out*(1 - fade_weights)
         new_fade_in = fade_in_match*fade_weights
         crossfaded_audio = new_fade_in + new_fade_out
