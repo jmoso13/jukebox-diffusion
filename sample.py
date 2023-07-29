@@ -29,6 +29,7 @@ def run(*args, **kwargs):
   token_multiplier = kwargs['token_multiplier']
   seconds_length = kwargs['seconds_length']
   levels = kwargs['levels']
+  print('levels: ', levels)
   # Check init audio
   init_audio = kwargs['init_audio']
   if init_audio is not None:
