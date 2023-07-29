@@ -814,7 +814,7 @@ class Sampler:
             new_audio = rearrange(new_audio, "b c t -> b t c")
             _, new_audio_enc = self.diffusion_models[level].encode(new_audio)
             new_audio_enc = rearrange(new_audio_enc, "b c t -> b t c").to(device)
-            self.context_windows[level] = t.cat[[keep, new_audio_enc], dim=1]
+            self.context_windows[level] = t.cat([keep, new_audio_enc], dim=1)
             assert self.context_windows[level].shape[1] == cur_context_length
         else:
             new_audio = self.final_audio_container[:,:,-cur_context_sample_length:]
