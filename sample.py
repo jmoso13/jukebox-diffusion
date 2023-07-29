@@ -28,7 +28,7 @@ def run(*args, **kwargs):
   sr = 44100
   token_multiplier = kwargs['token_multiplier']
   seconds_length = kwargs['seconds_length']
-  levels = kwargs['levels']
+  levels = [int(level) for level in kwargs['levels']]
   print('levels: ', levels)
   # Check init audio
   init_audio = kwargs['init_audio']
