@@ -104,9 +104,8 @@ class DDModel:
     pad_length = og_dd_sample_size - stereo_audio.shape[2]
     pad = torch.zeros((1, 2, pad_length)).to('cuda')
     padded_audio = torch.cat([stereo_audio, pad], dim=2)
-    padded_noise = torch.cat([noise, pad], dim=2)
     self.model = self.model.to('cuda')
-    generated = resample(self.model.diffusion_ema, padded_audio, padded_noise, steps, sampler_type=self.sampler_type, noise_level=noise_level)
+    generated = resample(self.model.diffusion_ema, padded_audio, noise, steps, sampler_type=self.sampler_type, noise_level=noise_level)
     self.model = self.model.to('cpu')
     tmp_saves = {'padded_audio':padded_audio, 'padded_noise':padded_noise, 'generated':generated}
     for fn, save in tmp_saves.items():
