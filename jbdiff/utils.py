@@ -684,13 +684,13 @@ class Sampler:
         # To GPU
         self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
         # Cut up and encode noise & init
-        cur_noise = base_noise.chunk(steps, dim=1)[step]
         if level < 2:
+            cur_noise = base_noise.chunk(steps, dim=1)[step]
             _, noise_enc = self.diffusion_models[level].encode(cur_noise)
             print('level is less than 2')
             print('noise_enc shape: ', noise_enc.shape)
         else:
-            noise_enc = cur_noise
+            noise_enc = base_noise.chunk(steps, dim=2)[step]
             print('level is 2')
             print('noise_enc shape: ', noise_enc.shape)
         if base_init is not None:
