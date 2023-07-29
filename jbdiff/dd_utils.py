@@ -15,6 +15,7 @@ import numpy as np
 from audio_diffusion.utils import Stereo, PadCrop
 from glob import glob
 import torchaudio
+from einops import rearrange
 
 
 class DiffusionUncond(nn.Module):
