@@ -107,7 +107,7 @@ class DDModel:
     self.model = self.model.to('cuda')
     generated = resample(self.model.diffusion_ema, padded_audio, noise, steps, sampler_type=self.sampler_type, noise_level=noise_level)
     self.model = self.model.to('cpu')
-    tmp_saves = {'padded_audio':padded_audio, 'padded_noise':padded_noise, 'generated':generated}
+    tmp_saves = {'padded_audio':padded_audio, 'padded_noise':noise, 'generated':generated}
     for fn, save in tmp_saves.items():
       final_audio = rearrange(save, 'b c t -> c (b t)')
       audio_fn = os.path.join('/home/ubuntu/sampling_trials/tmp_save/dd_samples', f"{fn}.wav")
