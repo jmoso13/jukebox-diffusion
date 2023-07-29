@@ -741,7 +741,9 @@ class Sampler:
                     xfade = self.xfade(fade_out, fade_in)
                     self.final_audio_container[:,:,self.cur_sample-self.dd_xfade_samples:self.cur_sample] = xfade
                 self.last_layer_0 = sample_audio
+                print(self.last_layer_0)
                 self.cur_sample += self.token_multiplier*self.base_tokens*self.level_mults[level]
+                print('cur sample: ', self.cur_sample)
                 self.update_dd_noise()
             return None
         else:

@@ -171,7 +171,7 @@ def run(*args, **kwargs):
                           base_noise=noise, 
                           base_init=init_audio
                         )
-    sampler.update_context_window(levels[0])
+    # sampler.update_context_window(levels[0])
 
   if pad is not None:
     final_audio = sampler.final_audio_container[:,:,:-pad]
