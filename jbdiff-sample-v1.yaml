@@ -12,9 +12,9 @@ sampling:
                   init_strength: 0.0
                   ckpt_loc: "/home/ubuntu/repo_trials/layer_0_ckpts/epoch=543-step=705000.ckpt"
             1:
-                  num_steps: 4
+                  num_steps: 20
                   embedding_strength: 1.3
-                  init_strength: 0.0
+                  init_strength: 0.6
                   ckpt_loc: "/home/ubuntu/repo_trials/layer_1_ckpts/epoch=1404-step=455000.ckpt"
             2:
                   num_steps: 250
