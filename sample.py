@@ -61,7 +61,7 @@ def run(*args, **kwargs):
   project_name = kwargs['project_name']
 
   # Adapt command line args
-  use_dd = 'dd' in levels
+  use_dd = kwargs['use_dd']
   levels = list(reversed(sorted([l for l in levels if l in (0,1,2)])))
   current_epoch_seconds = int(time.time())
   rotating_seed = current_epoch_seconds%31556952
@@ -247,6 +247,7 @@ def main():
   parser.add_argument('--noise-step-size', help='How far to wander around init noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
   parser.add_argument('--dd-noise-step-size', help='How far to wander around init DD noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
   parser.add_argument('--token-multiplier', help='Multiplier for base_tokens', default=1, type=int)
+  parser.add_argument('--use-dd', help'whether or not to use dd', default=True, type=bool)
   args = parser.parse_args()
 
 
