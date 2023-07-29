@@ -673,7 +673,6 @@ class Sampler:
             self.dd_steps = self.sampling_conf["dd"]["num_steps"]
             self.dd_init_strength = self.sampling_conf["dd"]["init_strength"]
             self.dd_noise_rng = custom_random_generator(sampling_args.dd_noise_seed)
-            self.dd_home_noise = self.dd_noise.clone()
             self.dd_noise_style = sampling_args.dd_noise_style
             self.dd_noise_step = sampling_args.dd_noise_step
             self.dd_effective_length = 0
@@ -681,6 +680,7 @@ class Sampler:
                 self.dd_effedctive_length += self.dd_sample_size
             self.dd_noise = t.randn([1, 2, self.dd_effective_length], generator=self.dd_noise_rng).to(device)
             self.dd_model = DDModel(sample_size=self.dd_sample_size, effective_length=self.dd_effective_length, sr=self.sr, custom_ckpt_path=self.dd_ckpt)
+            self.dd_home_noise = self.dd_noise.clone()
 
     def sample_level(self, step, steps, level_idx, base_noise, base_init):
         level = self.levels[level_idx]
