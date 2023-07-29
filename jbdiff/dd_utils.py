@@ -80,7 +80,7 @@ class DDModel:
 
     args = Object()
     # TODO update arg to pass dd sample size
-    args.sample_size = 65536
+    args.sample_size = self.sample_size
     args.sample_rate = self.sample_rate
     args.latent_dim = self.latent_dim
     
@@ -97,11 +97,10 @@ class DDModel:
 
   def sample(self, audio_sample, steps, init_strength, noise):
     # TODO: pass dd sample size as an arg
-    og_dd_sample_size = 65536
     noise_level = 1.0-init_strength
     stereo_audio = self.augs(audio_sample.squeeze(0)).unsqueeze(0)
     # assert stereo_audio.shape[2] == noise.shape[2]
-    pad_length = og_dd_sample_size - stereo_audio.shape[2]
+    pad_length = self.sample_size - stereo_audio.shape[2]
     pad = torch.zeros((1, 2, pad_length)).to('cuda')
     padded_audio = torch.cat([stereo_audio, pad], dim=2)
     self.model = self.model.to('cuda')

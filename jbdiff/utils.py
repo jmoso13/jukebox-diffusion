@@ -667,13 +667,13 @@ class Sampler:
         if self.use_dd:
             self.dd_base_samples = self.base_tokens*self.level_mults[self.levels[-1]]
             self.dd_xfade_samples = self.sampling_conf["dd"]["xfade_samples"]
-            self.dd_sample_size = self.dd_base_samples+self.dd_xfade_samples
+            self.dd_sample_size = 65536
             self.dd_ckpt = self.sampling_conf["dd"]["ckpt_loc"]
             self.dd_model = DDModel(sample_size=self.dd_sample_size, sr=self.sr, custom_ckpt_path=self.dd_ckpt)
             self.dd_steps = self.sampling_conf["dd"]["num_steps"]
             self.dd_init_strength = self.sampling_conf["dd"]["init_strength"]
             self.dd_noise_rng = custom_random_generator(sampling_args.dd_noise_seed)
-            self.dd_noise = t.randn([1, 2, 65536], generator=self.dd_noise_rng).to(device)
+            self.dd_noise = t.randn([1, 2, self.dd_sample_size], generator=self.dd_noise_rng).to(device)
             self.dd_home_noise = self.dd_noise.clone()
             self.dd_noise_style = sampling_args.dd_noise_style
             self.dd_noise_step = sampling_args.dd_noise_step
