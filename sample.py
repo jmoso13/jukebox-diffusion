@@ -185,6 +185,8 @@ def run(*args, **kwargs):
     combine_png_files(save_dir, level, fps)
     # combine_video_with_audio(save_dir, level)
 
+  print(f"Files can be found in {save_dir}")
+
 
 #----------------------------------------------------------------------------
 
