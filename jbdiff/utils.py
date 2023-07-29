@@ -656,6 +656,7 @@ class Sampler:
         self.levels = sampling_args.levels
         self.level_mults = sampling_args.level_mults
         self.base_tokens = sampling_args.base_tokens
+        self.token_multiplier = sampling_args.token_multiplier
         self.context_windows = context_windows
         self.context_mult = sampling_args.context_mult 
         self.final_audio_container = final_audio_container
@@ -665,7 +666,7 @@ class Sampler:
         self.xfade_style = sampling_args.xfade_style.lower()
         assert self.xfade_style in ('linear, constant-power'), "chosen xfade_style has to be either 'linear' or 'constant-power', please alter in yaml"
         if self.use_dd:
-            self.dd_base_samples = self.base_tokens*self.level_mults[self.levels[-1]]
+            self.dd_base_samples = self.base_tokens*self.token_multiplier*self.level_mults[self.levels[-1]]
             self.dd_xfade_samples = self.sampling_conf["dd"]["xfade_samples"]
             self.dd_sample_size = 65536
             self.dd_ckpt = self.sampling_conf["dd"]["ckpt_loc"]
@@ -737,7 +738,7 @@ class Sampler:
                     xfade = self.xfade(fade_out, fade_in)
                     self.final_audio_container[:,:,self.cur_sample-self.dd_xfade_samples:self.cur_sample] = xfade
                 self.last_layer_0 = sample_audio
-                self.cur_sample += self.base_tokens*self.level_mults[level]
+                self.cur_sample += self.token_multiplier*self.base_tokens*self.level_mults[level]
                 self.update_dd_noise()
             return None
         else:
@@ -801,12 +802,24 @@ class Sampler:
 
     def update_context_window(self, level):
         cur_context = self.context_windows[level]
-        window_shift_length = self.base_tokens*self.level_mults[level]
-        new_audio = self.final_audio_container[:,:,self.cur_sample-window_shift_length:self.cur_sample]
-        new_audio = rearrange(new_audio, "b c t -> b t c")
-        _, new_audio_enc = self.diffusion_models[level].encode(new_audio)
-        new_audio_enc = rearrange(new_audio_enc, "b c t -> b t c").to(device)
-        self.context_windows[level] = t.cat([*cur_context.chunk(self.context_mult, dim=1)[1:], new_audio_enc], dim=1)
+        cur_context_length = cur_context.shape[1]
+        cur_context_sample_length = cur_context_length*self.level_mults[level]
+        if self.cur_sample < cur_context_sample_length:
+            keep = cur_context_length - self.cur_sample//self.level_mults[level]
+            keep = cur_context[:,-keep:, :]
+            new_audio = self.final_audio_container[:,:,:self.cur_sample]
+            new_audio = rearrange(new_audio, "b c t -> b t c")
+            _, new_audio_enc = self.diffusion_models[level].encode(new_audio)
+            new_audio_enc = rearrange(new_audio_enc, "b c t -> b t c").to(device)
+            self.context_windows[level] = t.cat[keep, new_audio_enc, dim=1]
+            assert self.context_windows[level].shape[1] == cur_context_length
+        else:
+            new_audio = self.final_audio_container[:,:,-cur_context_sample_length:]
+            new_audio = rearrange(new_audio, "b c t -> b t c")
+            _, new_audio_enc = self.diffusion_models[level].encode(new_audio)
+            new_audio_enc = rearrange(new_audio_enc, "b c t -> b t c").to(device)
+            self.context_windows[level] = new_audio_enc.clone()
+            assert self.context_windows[level].shape[1] == cur_context_length
 
     def update_dd_noise(self):
         if self.dd_noise_style == 'random':

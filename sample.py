@@ -26,6 +26,7 @@ def run(*args, **kwargs):
 
   # Load args from command line
   sr = 44100
+  token_multiplier = kwargs['token_multiplier']
   seconds_length = kwargs['seconds_length']
   levels = kwargs['levels']
   # Check init audio
@@ -108,7 +109,7 @@ def run(*args, **kwargs):
 
   # Setup for Sampling
   level_mults = {0:8, 1:32, 2:128}
-  lowest_sample_window_length = base_tokens*level_mults[levels[0]]
+  lowest_sample_window_length = token_multiplier*base_tokens*level_mults[levels[0]]
   num_window_shifts = int((seconds_length*sr)//lowest_sample_window_length)
   leftover_window = round(seconds_length*sr) - num_window_shifts*lowest_sample_window_length
   if leftover_window > 0:
@@ -125,7 +126,7 @@ def run(*args, **kwargs):
     diffusion_models[level] = diffusion_models[level].to('cpu')
 
   # Init noise
-  noise = get_base_noise(num_window_shifts, base_tokens, noise_seed, style=noise_style)
+  noise = get_base_noise(num_window_shifts, token_multiplier*base_tokens, noise_seed, style=noise_style)
 
   # Load Init Audio and Init Final Audio Container
   if init_audio is not None:
@@ -143,6 +144,7 @@ def run(*args, **kwargs):
       self.levels = levels
       self.level_mults = level_mults
       self.base_tokens = base_tokens
+      self.token_multiplier = token_multiplier
       self.context_mult = context_mult
       self.save_dir = save_dir
       self.sr = sr
@@ -179,7 +181,7 @@ def run(*args, **kwargs):
 
   for level in levels:
     combine_wav_files(save_dir, level)
-    fps = round(sr/base_tokens/level_mults[level], 3)
+    fps = round(sr/token_multiplier*base_tokens/level_mults[level], 3)
     combine_png_files(save_dir, level, fps)
     # combine_video_with_audio(save_dir, level)
 
@@ -230,6 +232,7 @@ def main():
   parser.add_argument('--dd-noise-style', help='How the random noise for generating in Dance Diffusion progresses: random, constant, region, walk', default='random', type=str)
   parser.add_argument('--noise-step-size', help='How far to wander around init noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
   parser.add_argument('--dd-noise-step-size', help='How far to wander around init DD noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
+  parser.add_argument('--token-multiplier' help='Multiplier for base_tokens', default=1, type=int)
   args = parser.parse_args()
 
 
