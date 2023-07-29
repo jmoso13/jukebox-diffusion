@@ -66,8 +66,9 @@ def resample(model_fn, audio, noise, steps=100, sampler_type="v-ddim", noise_lev
 
 
 class DDModel:
-  def __init__(self, sample_size, sr, custom_ckpt_path, sampler_type="v-ddim"):
+  def __init__(self, sample_size, effective_length, sr, custom_ckpt_path, sampler_type="v-ddim"):
     self.sample_size = sample_size
+    self.effective_length = effective_length
     self.sample_rate = sr 
     self.latent_dim = 0  
     self.ckpt_path = custom_ckpt_path  
@@ -100,7 +101,7 @@ class DDModel:
     noise_level = 1.0-init_strength
     stereo_audio = self.augs(audio_sample.squeeze(0)).unsqueeze(0)
     # assert stereo_audio.shape[2] == noise.shape[2]
-    pad_length = self.sample_size - stereo_audio.shape[2]
+    pad_length = self.effective_length - stereo_audio.shape[2]
     pad = torch.zeros((1, 2, pad_length)).to('cuda')
     padded_audio = torch.cat([stereo_audio, pad], dim=2)
     self.model = self.model.to('cuda')
