@@ -556,6 +556,7 @@ def custom_random_generator(seed):
 
 def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random', noise_step_size=0.05):
     rng = custom_random_generator(noise_seed)
+    home_noise_weight = math.sqrt(1 - noise_step_size**2)
     if style == 'random':
         return t.randn([1, 64, num_window_shifts*base_tokens], generator=rng).to(device)
     elif style == 'constant':
@@ -563,11 +564,17 @@ def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random', n
         return t.cat([r_noise for _ in range(num_window_shifts)], dim=2).to(device)
     elif style == 'region':
         home_noise = t.randn([1, 64, base_tokens], generator=rng)
-        return t.cat([home_noise]+[home_noise+noise_step_size*t.randn([1, 64, base_tokens], generator=rng) for _ in range(num_window_shifts-1)], dim=2).to(device)
+        return t.cat([home_noise]+[home_noise_weight*home_noise+noise_step_size*t.randn([1, 64, base_tokens], generator=rng) for _ in range(num_window_shifts-1)], dim=2).to(device)
     elif style == 'walk':
         home_noise = t.randn([1, 64, base_tokens], generator=rng)
-        random_tensors = [home_noise] + [noise_step_size*t.randn([1, 64, base_tokens], generator=rng) for _ in range(num_window_shifts-1)]
-        cumulative_tensors = [sum(random_tensors[:i + 1]) for i in range(len(random_tensors))]
+        cumulative_tensors = [home_noise]
+        new_noise = home_noise
+        for i in range(num_window_shifts-1):
+            new_noise = home_noise_weight*new_noise + noise_step_size*t.randn([1, 64, base_tokens], generator=rng)
+            cumulative_tensors += [new_noise]
+            print('New noise mean: ', new_noise.mean())
+            print('New noise std:  ', new_noise.std())
+            print('New noise distance from home: ', np.linalg.norm(home_noise - new_noise))
         return t.cat(cumulative_tensors, dim=2).to(device)
     else:
         raise Exception("Noise style must be either 'constant', 'random', 'region', or 'walk'")
@@ -675,6 +682,7 @@ class Sampler:
             self.dd_noise_rng = custom_random_generator(sampling_args.dd_noise_seed)
             self.dd_noise_style = sampling_args.dd_noise_style
             self.dd_noise_step = sampling_args.dd_noise_step
+            self.dd_home_noise_scale = math.sqrt(1 - self.dd_noise_step**2)
             self.dd_effective_length = 0
             while self.dd_effective_length < self.dd_base_samples+self.dd_xfade_samples:
                 self.dd_effective_length += self.dd_sample_size
@@ -832,8 +840,13 @@ class Sampler:
         elif self.dd_noise_style == 'constant':
             pass
         elif self.dd_noise_style == 'region':
-            self.dd_noise = self.dd_home_noise + self.dd_noise_step*t.randn([1, 2, self.dd_effective_length], generator=self.dd_noise_rng).to(device)
+            self.dd_noise = self.dd_home_noise_scale*self.dd_home_noise + self.dd_noise_step*t.randn([1, 2, self.dd_effective_length], generator=self.dd_noise_rng).to(device)
         elif self.dd_noise_style == 'walk':
-            self.dd_noise += self.dd_noise_step*t.randn([1, 2, self.dd_effective_length], generator=self.dd_noise_rng).to(device)
+            self.dd_noise = self.dd_home_noise_scale*self.dd_noise + self.dd_noise_step*t.randn([1, 2, self.dd_effective_length], generator=self.dd_noise_rng).to(device)
         else:
             raise Exception("DD noise style must be either 'constant', 'random', 'region', or 'walk'")
+
+        print('Updated dd noise mean: ', self.dd_noise.mean())
+        print('Updated dd noise std:  ', self.dd_noise.std())
+        print('Updated dd noise distance from home: ', np.linalg.norm(self.dd_home_noise - self.dd_noise))
+
