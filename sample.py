@@ -182,7 +182,7 @@ def run(*args, **kwargs):
 
   for level in levels:
     combine_wav_files(save_dir, level)
-    fps = round(sr/token_multiplier*base_tokens/level_mults[level], 3)
+    fps = round(sr/(token_multiplier*base_tokens)/level_mults[level], 3)
     combine_png_files(save_dir, level, fps)
     # combine_video_with_audio(save_dir, level)
 
@@ -244,8 +244,8 @@ def main():
   parser.add_argument('--noise-style', help='How the random noise for generating base layer of Jukebox Diffusion progresses: random, constant, region, walk', default='random', type=str)
   parser.add_argument('--dd-noise-seed', help='Random seed to use for sampling Dance Diffusion', default=None, type=int)
   parser.add_argument('--dd-noise-style', help='How the random noise for generating in Dance Diffusion progresses: random, constant, region, walk', default='random', type=str)
-  parser.add_argument('--noise-step-size', help='How far to wander around init noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
-  parser.add_argument('--dd-noise-step-size', help='How far to wander around init DD noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.05, type=float)
+  parser.add_argument('--noise-step-size', help='How far to wander around init noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.75, type=float)
+  parser.add_argument('--dd-noise-step-size', help='How far to wander around init DD noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.5, type=float)
   parser.add_argument('--token-multiplier', help='Multiplier for base_tokens', default=1, type=int)
   parser.add_argument('--use-dd', help='whether or not to use dd', default=True, type=bool)
   args = parser.parse_args()
