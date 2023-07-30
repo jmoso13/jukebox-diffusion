@@ -574,7 +574,7 @@ def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random', n
             cumulative_tensors += [new_noise]
             print('New noise mean: ', new_noise.mean())
             print('New noise std:  ', new_noise.std())
-            print('New noise distance from home: ', np.linalg.norm(home_noise - new_noise))
+            print('New noise distance from home: ', t.norm(home_noise - new_noise))
         return t.cat(cumulative_tensors, dim=2).to(device)
     else:
         raise Exception("Noise style must be either 'constant', 'random', 'region', or 'walk'")
@@ -848,5 +848,5 @@ class Sampler:
 
         print('Updated dd noise mean: ', self.dd_noise.mean())
         print('Updated dd noise std:  ', self.dd_noise.std())
-        print('Updated dd noise distance from home: ', np.linalg.norm(self.dd_home_noise - self.dd_noise))
+        print('Updated dd noise distance from home: ', t.norm(self.dd_home_noise - self.dd_noise))
 
