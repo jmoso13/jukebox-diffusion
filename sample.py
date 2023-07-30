@@ -30,6 +30,7 @@ def run(*args, **kwargs):
   seconds_length = kwargs['seconds_length']
   levels = [int(level) for level in kwargs['levels']]
   print('levels: ', levels)
+  update_lowest_context = kwargs['update_lowest_context']
   # Check init audio
   init_audio = kwargs['init_audio']
   if init_audio is not None:
@@ -172,7 +173,8 @@ def run(*args, **kwargs):
                           base_noise=noise, 
                           base_init=init_audio
                         )
-    # sampler.update_context_window(levels[0])
+    if update_lowest_context:
+      sampler.update_context_window(levels[0])
 
   if pad is not None:
     final_audio = sampler.final_audio_container[:,:,:-pad]
@@ -248,6 +250,7 @@ def main():
   parser.add_argument('--dd-noise-step-size', help='How far to wander around init DD noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.5, type=float)
   parser.add_argument('--token-multiplier', help='Multiplier for base_tokens', default=1, type=int)
   parser.add_argument('--use-dd', help='whether or not to use dd', default=True, type=bool)
+  parser.add_argument('--update-lowest-context', help='whether or not to update lowest context', default=False, type=bool)
   args = parser.parse_args()
 
 
