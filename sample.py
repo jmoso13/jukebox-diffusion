@@ -177,7 +177,7 @@ def run(*args, **kwargs):
       sampler.update_context_window(levels[0])
       from einops import rearrange
       context_q = rearrange(sampler.context_windows[levels[0]].clone().to('cpu'), 'b t c -> b c t')
-      decoded_context = diffusion_models[level].decode(context_q)
+      decoded_context = diffusion_models[levels[0]].decode(context_q)
       decoded_context = rearrange(decoded_context, 'b t c -> b c t')
       save_final_audio(decoded_context, '/home/ubuntu/sampling_trials/tmp_save/context', sr)
 
