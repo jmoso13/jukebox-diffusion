@@ -175,6 +175,10 @@ def run(*args, **kwargs):
                         )
     if update_lowest_context:
       sampler.update_context_window(levels[0])
+      decoded_context = diffusion_models[level].decode(sampler.context_windows[levels[0]].clone().to('cpu'))
+      from einops import rearrange
+      decoded_context = rearrange(decoded_context, 'b t c -> b c t')
+      save_final_audio(decoded_context, '/home/ubuntu/sampling_trials/tmp_save/context', sr)
 
   if pad is not None:
     final_audio = sampler.final_audio_container[:,:,:-pad]
