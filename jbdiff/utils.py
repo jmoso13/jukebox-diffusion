@@ -699,12 +699,8 @@ class Sampler:
         if level < 2:
             cur_noise = base_noise.chunk(steps, dim=1)[step]
             _, noise_enc = self.diffusion_models[level].encode(cur_noise)
-            print('level is less than 2')
-            print('noise_enc shape: ', noise_enc.shape)
         else:
             noise_enc = base_noise.chunk(steps, dim=2)[step]
-            print('level is 2')
-            print('noise_enc shape: ', noise_enc.shape)
         if base_init is not None:
             cur_init = base_init.chunk(steps, dim=1)[step]
             _, init_enc = self.diffusion_models[level].encode(cur_init)
@@ -749,7 +745,6 @@ class Sampler:
                     xfade = self.xfade(fade_out, fade_in)
                     self.final_audio_container[:,:,self.cur_sample-self.dd_xfade_samples:self.cur_sample] = xfade
                 self.last_layer_0 = sample_audio
-                print(self.last_layer_0)
                 self.cur_sample += self.token_multiplier*self.base_tokens*self.level_mults[level]
                 print('cur sample: ', self.cur_sample)
                 self.update_dd_noise()
