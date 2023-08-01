@@ -129,6 +129,7 @@ def run(*args, **kwargs):
 
   # Init noise
   noise = get_base_noise(num_window_shifts, token_multiplier*base_tokens, noise_seed, style=noise_style)
+  print(noise)
 
   # Load Init Audio and Init Final Audio Container
   if init_audio is not None:
