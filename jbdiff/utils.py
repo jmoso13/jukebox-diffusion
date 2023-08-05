@@ -528,8 +528,8 @@ def parse_diff_conf(diff_conf):
 def load_aud(fn, sr, offset, duration, pad=None):
     audio, _ = load_audio(fn, sr=sr, offset=offset, duration=duration)
     if pad is not None:
-        padded_tensor = t.tensor(np.zeros((audio.shape[0], pad)))
-        audio = t.cat([audio, padded_tensor], dim=1)
+        padded = np.zeros((audio.shape[0], pad))
+        audio = np.concatenate([audio, padded], axis=1)
     audio = audio.T
     return t.tensor(np.expand_dims(audio, axis=0)).to('cuda', non_blocking=True).detach()
 
