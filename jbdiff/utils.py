@@ -572,9 +572,6 @@ def get_base_noise(num_window_shifts, base_tokens, noise_seed, style='random', n
         for i in range(num_window_shifts-1):
             new_noise = home_noise_weight*new_noise + noise_step_size*t.randn([1, 64, base_tokens], generator=rng)
             cumulative_tensors += [new_noise]
-            print('New noise mean: ', new_noise.mean())
-            print('New noise std:  ', new_noise.std())
-            print('New noise distance from home: ', t.norm(home_noise - new_noise))
         return t.cat(cumulative_tensors, dim=2).to(device)
     else:
         raise Exception("Noise style must be either 'constant', 'random', 'region', or 'walk'")
@@ -704,8 +701,6 @@ class Sampler:
         if base_init is not None:
             cur_init = base_init.chunk(steps, dim=1)[step]
             _, init_enc = self.diffusion_models[level].encode(cur_init)
-            print('base init is not None')
-            print('cur_init shape: ', cur_init.shape, 'init_enc shape: ', init_enc.shape)
         else:
             init_enc = None
         # Grab hps from sampling conf
@@ -757,7 +752,6 @@ class Sampler:
                 # Using noise_style either provide frozen sampled noise or newly sampled noise every iter for each level
                 self.sample_level(next_step, next_steps, level_idx+1, base_noise=sample_audio, base_init=sample_audio)
                 self.update_context_window(self.levels[level_idx+1])
-                print('updating context_window at current level for next sampling step, grabbing from finished audio')
             return None
 
     def save_sample_audio(self, sample_audio, level):
@@ -841,7 +835,5 @@ class Sampler:
         else:
             raise Exception("DD noise style must be either 'constant', 'random', 'region', or 'walk'")
 
-        print('Updated dd noise mean: ', self.dd_noise.mean())
-        print('Updated dd noise std:  ', self.dd_noise.std())
-        print('Updated dd noise distance from home: ', t.norm(self.dd_home_noise - self.dd_noise))
+        # print('Updated dd noise distance from home: ', t.norm(self.dd_home_noise - self.dd_noise))
 
