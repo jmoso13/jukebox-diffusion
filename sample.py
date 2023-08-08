@@ -106,8 +106,8 @@ def run(*args, **kwargs):
   for k,v in diffusion_models.items():
     assert not v.diffusion.training
     assert not v.vqvae.training
-    print(f"Level {k} VQVAE on device: {next(v.vqvae.parameters()).device}")
-    print(f"Level {k} Diffusion Model on device: {next(v.diffusion.parameters()).device}")
+    # print(f"Level {k} VQVAE on device: {next(v.vqvae.parameters()).device}")
+    # print(f"Level {k} Diffusion Model on device: {next(v.diffusion.parameters()).device}")
 
   # Setup for Sampling
   level_mults = {0:8, 1:32, 2:128}
