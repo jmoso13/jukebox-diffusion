@@ -89,6 +89,7 @@ def run(*args, **kwargs):
   # Load diffusion and vqvae models
   diffusion_models = dict()
   for level in levels:
+    print(f"Loading Level {level}")
     # Load VQ-VAEs
     vqvae, _, _ = make_jb(".", level, batch_size, base_tokens, context_mult, aug_shift, num_workers=12, train=False)
     # Load Diff Models
