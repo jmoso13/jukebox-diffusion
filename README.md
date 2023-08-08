@@ -7,9 +7,9 @@ At its core Jukebox Diffusion is a hierarchical latent diffusion model. JBDiff u
 At each of the three latent levels a Denoising U-Net Model is trained to iteratively denoise a normally distributed variable to sample vectors representing compressed audio.
 The final layer of JBDiff is a Dance Diffusion Denoising U-Net model, providing a bump in audio quality and transforming the mono output of Jukebox into final stereo audio.
 
-![jbdiff-chart](assets/jbdiff_chart.png)
-
 Read more on [Medium](https://medium.com/@jeffsontagmusic)
+
+![jbdiff-chart](assets/jbdiff_chart.png)
 
 ## Installation
 
