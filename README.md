@@ -181,11 +181,16 @@ sampling:
 
 Each section refers to a level in the JBDiff architecture. 2 is the lowest level/highest compression. 0 is the highest level before Dance Diffusion model. dd level refers to the Dance Diffusion level
 
-*num_steps: number of steps to take in the diffusion process for this level
-embedding_strength: weight for context in cross-attention reasonable values are 0-10
-init_strength: strength of lower level init at current level
-ckpt_loc: string location of all checkpoints
-xfade_samples: number of samples for crossfade on the dd level
-xfade_style: can be either 'linear' or 'constant-power'* 
+*num_steps: number of steps to take in the diffusion process for this level*
+
+*embedding_strength: weight for context in cross-attention reasonable values are 0-10*
+
+*init_strength: strength of lower level init at current level*
+
+*ckpt_loc: string location of all checkpoints*
+
+*xfade_samples: number of samples for crossfade on the dd level*
+
+*xfade_style: can be either 'linear' or 'constant-power'*
 
 Have fun! 
