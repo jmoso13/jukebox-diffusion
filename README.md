@@ -8,6 +8,7 @@ At each of the three latent levels a Denoising U-Net Model is trained to iterati
 The final layer of JBDiff is a Dance Diffusion Denoising U-Net model, providing a bump in audio quality and transforming the mono output of Jukebox into final stereo audio.
 
 Read more on [Medium](https://medium.com/@jeffsontagmusic)
+
 Examples can be heard [here](https://www.youtube.com/watch?v=dwI1sn-Ldp0)
 
 ![jbdiff-chart](assets/jbdiff_chart.png)
