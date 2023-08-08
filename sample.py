@@ -1,6 +1,6 @@
 import os
 import argparse
-from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler, get_final_audio_container, save_final_audio, combine_wav_files, combine_png_files, combine_video_with_audio
+from jbdiff.utils import read_yaml_file, parse_diff_conf, make_jb, JBDiffusion, load_aud, get_base_noise, Sampler, get_final_audio_container, save_final_audio, combine_wav_files, combine_png_files
 import wave
 from glob import glob
 import numpy as np
@@ -182,7 +182,7 @@ def run(*args, **kwargs):
       save_final_audio(decoded_context, '/home/ubuntu/sampling_trials/tmp_save/context', sr)
 
   if pad is not None:
-    final_audio = sampler.final_audio_container[:,:,:-pad]
+    final_audio = sampler.final_audio_container[:,:,:-pad].clone()
   else:
     final_audio = sampler.final_audio_container.clone()
   save_final_audio(final_audio, save_dir, sr)
@@ -191,7 +191,6 @@ def run(*args, **kwargs):
     combine_wav_files(save_dir, level)
     fps = round(sr/(token_multiplier*base_tokens)/level_mults[level], 3)
     combine_png_files(save_dir, level, fps)
-    # combine_video_with_audio(save_dir, level)
 
   print(f"Files can be found in {save_dir}")
 
@@ -224,11 +223,11 @@ def _path_exists(p):
 
 _examples = '''examples:
 
-  # Train deepest level JBDiff on personal music library
-  python train.py --train-data ./wavs --jb-level 2 --ckpt-save-location ./ckpts 
+  # Sample for 30s using all levels with no init audio conditioned on song_a.wav, save results to a directory called results/
+  python sample.py --seconds-length 30 --context-audio song_a.wav --save-dir results --project-name jbdiff_fun --levels 012
 
-  # Resume training middle layer of JBDiff from checkpoint
-  python train.py --train-data ./wavs --jb-level 1 --ckpt-save-location ./ckpts --resume-network-pkl ./ckpts/ckpt1.ckpt
+  # Sample for length of init audio song_b.wav using song_a.wav as context, use only levels 2 & 1 and use token-multiplier of 4, both of these will speed up generation, also change the dd-noise-style to 'walk'
+  python sample.py --init-audio song_b.wav --init-strength 0.15 --context-audio song_a.wav --save-dir results --project-name jbdiff_fun --levels 12 --dd-noise-style walk --token-multiplier 4
 
 '''
 
@@ -251,8 +250,8 @@ def main():
   parser.add_argument('--noise-style', help='How the random noise for generating base layer of Jukebox Diffusion progresses: random, constant, region, walk', default='random', type=str)
   parser.add_argument('--dd-noise-seed', help='Random seed to use for sampling Dance Diffusion', default=None, type=int)
   parser.add_argument('--dd-noise-style', help='How the random noise for generating in Dance Diffusion progresses: random, constant, region, walk', default='random', type=str)
-  parser.add_argument('--noise-step-size', help='How far to wander around init noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.75, type=float)
-  parser.add_argument('--dd-noise-step-size', help='How far to wander around init DD noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.5, type=float)
+  parser.add_argument('--noise-step-size', help='How far to wander around init noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.6, type=float)
+  parser.add_argument('--dd-noise-step-size', help='How far to wander around init DD noise, should be between 0-1, if set to 0 will act like constant noise, if set to 1 will act like random noise', default=0.4, type=float)
   parser.add_argument('--token-multiplier', help='Multiplier for base_tokens', default=1, type=int)
   parser.add_argument('--use-dd', help='whether or not to use dd', default=True, type=bool)
   parser.add_argument('--update-lowest-context', help='whether or not to update lowest context', default=False, type=bool)
