@@ -404,6 +404,7 @@ class DemoCallback(pl.Callback):
         self.base_tokens = global_args.base_tokens
         self.dirpath = global_args.dirpath
         self.embedding_scale = global_args.embedding_scale
+        self.context_mult = global_args.context_mult
 
     @rank_zero_only
     @t.no_grad()
@@ -472,7 +473,7 @@ class DemoCallback(pl.Callback):
                     fakes, sample_z, sample_q = batch_postprocess(fakes.detach(), module.vqvae, module.level)
                     sampled = rearrange(norm_pre(sample_q, module.vqvae, module.level), 'b c t -> b t c')
                     # Update embedding
-                    embedding = t.cat([*embedding.chunk(context_mult, dim=1)[1:], sampled], dim=1)
+                    embedding = t.cat([*embedding.chunk(self.context_mult, dim=1)[1:], sampled], dim=1)
                     full_fakes[:, :, self.base_samples*(hop+5):self.base_samples*(hop+6)] += fakes
                     # Sample randomly new noise
                     noise = t.randn([self.num_demos, 64, self.base_tokens]).to(device)

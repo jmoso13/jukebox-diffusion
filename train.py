@@ -62,6 +62,7 @@ def run(*args, **kwargs):
       self.base_tokens = base_tokens
       self.dirpath = save_path
       self.embedding_scale = embedding_weight
+      self.context_mult = context_mult
 
   demo_args = DemoArgs()
 
