@@ -651,6 +651,11 @@ def combine_video_with_audio(save_dir, level):
     subprocess.run(ffmpeg_command)
 
 
+def wget(url, outputdir='.'):
+    res = subprocess.run(['wget', url, '-P', f'{outputdir}'], stdout=subprocess.PIPE).stdout.decode('utf-8')
+    print(res)
+
+
 class Sampler:
     def __init__(self, cur_sample, diffusion_models, context_windows, final_audio_container, sampling_args):
         self.cur_sample = cur_sample
