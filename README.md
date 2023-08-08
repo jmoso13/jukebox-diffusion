@@ -187,7 +187,7 @@ Each section refers to a level in the JBDiff architecture. 2 is the lowest level
 
 *init_strength: strength of lower level init at current level*
 
-*ckpt_loc: string location of all checkpoints*
+*ckpt_loc: string location of level checkpoint*
 
 *xfade_samples: number of samples for crossfade on the dd level*
 
