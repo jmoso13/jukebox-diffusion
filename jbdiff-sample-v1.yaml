@@ -2,7 +2,7 @@ sampling:
       diffusion:
             dd:
                   num_steps: 150
-                  init_strength: 0.15
+                  init_strength: 0.23
                   ckpt_loc: "./epoch=2125-step=218000.ckpt"
                   xfade_samples: 1536
                   xfade_style: "constant-power"
