@@ -1,4 +1,9 @@
 # Jukebox Diffusion
+
+<p align="left">
+    <a href="https://colab.research.google.com/github/jmoso13/jukebox-diffusion/blob/main/Jukebox_Diffusion.ipynb"><img alt="Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>  
+</p>
+
 *Jukebox Diffusion relies heavily on work produced by [OpenAI](https://github.com/openai) (Jukebox) and [HarmonAI](https://github.com/Harmonai-org) (Dance Diffusion), also big thanks to [Flavio Schneider](https://github.com/flavioschneider) for his work creating the audio-diffusion repo I used for diffusion models*
 
 ![alien_planet](assets/jbdiff_planet.png)
@@ -10,6 +15,8 @@ The final layer of JBDiff is a Dance Diffusion Denoising U-Net model, providing 
 Read more on [Medium](https://medium.com/@jeffsontagmusic/jukebox-diffusion-cbe22ff3cd47)
 
 Examples can be heard [here](https://www.youtube.com/watch?v=dwI1sn-Ldp0)
+
+Notebook by [johannezz](https://github.com/deeplearn-art) [here](https://colab.research.google.com/github/jmoso13/jukebox-diffusion/blob/main/Jukebox_Diffusion.ipynb)
 
 ![jbdiff-chart](assets/jbdiff_chart.png)
 
