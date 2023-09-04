@@ -271,7 +271,6 @@ class JBDiffusion(pl.LightningModule):
         super().__init__()
 
         self.level = level
-        self.upsampler = self.level in (0,1)
         self.diffusion = DiffusionModel(**diffusion_kwargs)
         # self.diffusion_ema = deepcopy(self.diffusion)
         # self.ema_decay = global_args.ema_decay
@@ -290,21 +289,9 @@ class JBDiffusion(pl.LightningModule):
         z_q, x_q = batch_preprocess(x, self.vqvae, self.level)
         cond_z, cond_q = batch_preprocess(cond, self.vqvae, self.level)
         cond_q = rearrange(cond_q, "b c t -> b t c")
-        # Upsampler uses noisy data from level below
-        if self.upsampler:
-            # Run example through level below back to noisy audio
-            _, x_noise_q = batch_preprocess(x, self.vqvae, self.level+1)
-            x_noise_audio, _, _ = batch_postprocess(x_noise_q, self.vqvae, self.level+1)
-            x_noise_audio = rearrange(x_noise_audio, "b c t -> b t c")
-            # Preprocess and encode noisy audio at current level
-            _, x_noise = batch_preprocess(x_noise_audio, self.vqvae, self.level)
-            with t.cuda.amp.autocast():
-                # Step
-                loss = self.diffusion(x_q, noise=x_noise, embedding=cond_q, embedding_mask_proba=0.1)
-        else:
-            with t.cuda.amp.autocast():
-                # Step
-                loss = self.diffusion(x_q, embedding=cond_q, embedding_mask_proba=0.1)
+        with t.cuda.amp.autocast():
+            # Step
+            loss = self.diffusion(x_q, embedding=cond_q, embedding_mask_proba=0.1)
 
         log_dict = {
             'train/loss': loss.detach(),
@@ -427,56 +414,32 @@ class DemoCallback(pl.Callback):
         cond_q = cond_q[:self.num_demos]
         embedding = rearrange(cond_q, "b c t -> b t c")
         try:
-            if module.upsampler:
-                # If upsampler run audio through the lower level to extract noisy audio
-                _, x_noise_q = batch_preprocess(x, module.vqvae, module.level+1)
-                x_noise_audio, _, _ = batch_postprocess(x_noise_q, module.vqvae, module.level+1)
-                x_noise_audio = rearrange(x_noise_audio, "b c t -> b t c")
-                _, noise = batch_preprocess(x_noise_audio, module.vqvae, module.level)
-                noise = noise[:self.num_demos]
-                # Full audio container
-                full_fakes = t.tensor(repeat(np.zeros((self.num_demos, 1, self.base_samples)), 'b c t -> b c (repeat t)', repeat = 7), device=device)
-                # Include conditioned and noisy audio in the demo
-                x_a, _, n_x = batch_postprocess(x_q, module.vqvae, module.level)
-                cond_a, _, n_c =  batch_postprocess(cond_q, module.vqvae, module.level)
-                full_fakes[:, :, :self.base_samples*6] += t.cat([cond_a, x_a, rearrange(x_noise_audio[:self.num_demos], "b t c -> b c t"), cond_a], dim = 2)
-                # Diffuse
+            # Define noise
+            noise = t.randn([self.num_demos, 64, self.base_tokens]).to(device)
+            # Number of times to diffuse to get to demo length
+            hops = self.demo_samples//self.base_samples
+            # Full audio container
+            full_fakes = t.tensor(repeat(np.zeros((self.num_demos, 1, self.base_samples)), 'b c t -> b c (repeat t)', repeat = hops+5), device=device)
+            # Include conditioned and noisy audio in the demo
+            x_a, _, n_x = batch_postprocess(x_q, module.vqvae, module.level)
+            cond_a, _, n_c =  batch_postprocess(cond_q, module.vqvae, module.level)
+            full_fakes[:, :, :self.base_samples*5] += t.cat([cond_a, x_a, cond_a], dim = 2)
+            # Diffuse
+            for hop in tqdm.tqdm(range(hops)):
                 fakes = module.diffusion.sample(
                         noise.float(),
                         embedding=embedding.float(),
-                        embedding_scale=self.embedding_scale,
-                        num_steps=self.demo_steps 
+                        embedding_scale=self.embedding_scale, 
+                        num_steps=self.demo_steps
                       )
                 # Add diffused example to demo
                 fakes, sample_z, sample_q = batch_postprocess(fakes.detach(), module.vqvae, module.level)
-                full_fakes[:, :, self.base_samples*6:] += fakes
-            else:
-                # Define noise
+                sampled = rearrange(norm_pre(sample_q, module.vqvae, module.level), 'b c t -> b t c')
+                # Update embedding
+                embedding = t.cat([*embedding.chunk(self.context_mult, dim=1)[1:], sampled], dim=1)
+                full_fakes[:, :, self.base_samples*(hop+5):self.base_samples*(hop+6)] += fakes
+                # Sample randomly new noise
                 noise = t.randn([self.num_demos, 64, self.base_tokens]).to(device)
-                # Number of times to diffuse to get to demo length
-                hops = self.demo_samples//self.base_samples
-                # Full audio container
-                full_fakes = t.tensor(repeat(np.zeros((self.num_demos, 1, self.base_samples)), 'b c t -> b c (repeat t)', repeat = hops+5), device=device)
-                # Include conditioned and noisy audio in the demo
-                x_a, _, n_x = batch_postprocess(x_q, module.vqvae, module.level)
-                cond_a, _, n_c =  batch_postprocess(cond_q, module.vqvae, module.level)
-                full_fakes[:, :, :self.base_samples*5] += t.cat([cond_a, x_a, cond_a], dim = 2)
-                # Diffuse
-                for hop in tqdm.tqdm(range(hops)):
-                    fakes = module.diffusion.sample(
-                            noise.float(),
-                            embedding=embedding.float(),
-                            embedding_scale=self.embedding_scale, 
-                            num_steps=self.demo_steps
-                          )
-                    # Add diffused example to demo
-                    fakes, sample_z, sample_q = batch_postprocess(fakes.detach(), module.vqvae, module.level)
-                    sampled = rearrange(norm_pre(sample_q, module.vqvae, module.level), 'b c t -> b t c')
-                    # Update embedding
-                    embedding = t.cat([*embedding.chunk(self.context_mult, dim=1)[1:], sampled], dim=1)
-                    full_fakes[:, :, self.base_samples*(hop+5):self.base_samples*(hop+6)] += fakes
-                    # Sample randomly new noise
-                    noise = t.randn([self.num_demos, 64, self.base_tokens]).to(device)
 
             # Put the demos together
             full_fakes = rearrange(full_fakes, 'b d n -> d (b n)')
@@ -699,6 +662,10 @@ class Sampler:
         # To GPU
         self.diffusion_models[level] = self.diffusion_models[level].to('cuda')
         # Cut up and encode noise & init
+        ### THIS IS WHAT NEEDS TO CHANGE FOR SAMPLING ###
+        ### GRAB INTERMEDIATE NOISE BASED OFF GENERATOR LIKE BASE NOISE ###
+        ### UPSAMPLER PROBLEM ###
+        ### UPSAMPLERS STILL IMPLEMENTED HERE ###
         if level < 2:
             cur_noise = base_noise.chunk(steps, dim=1)[step]
             _, noise_enc = self.diffusion_models[level].encode(cur_noise)
