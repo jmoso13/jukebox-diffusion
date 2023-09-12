@@ -22,3 +22,4 @@ git+https://github.com/jmoso13/jukebox.git
 PyYAML
 git+https://github.com/Harmonai-org/sample-generator.git
 git+https://github.com/crowsonkb/v-diffusion-pytorch.git
+auraloss==0.4.0

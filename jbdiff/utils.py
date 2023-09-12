@@ -31,6 +31,7 @@ import yaml
 import importlib
 import subprocess
 from jbdiff.dd_utils import DDModel
+import auraloss
 
 
 class FilesAudioDataset(Dataset):
@@ -257,6 +258,28 @@ def ema_update(model, averaged_model, decay):
         averaged_buffers[name].copy_(buf)
 
 
+class CombinedLoss(nn.Module):
+    def __init__(self, sample_rate):
+        super(CombinedLoss, self).__init__()
+        self.sample_rate = sample_rate
+        self.mse_loss = t.nn.functional.mse_loss
+        self.sdstft = auraloss.freq.MultiResolutionSTFTLoss(sample_rate=self.sample_rate, 
+                                                            fft_sizes = [2048, 1024, 512, 256, 128, 64, 32],
+                                                            hop_sizes = [512, 256, 128, 64, 32, 16, 8],
+                                                            win_lengths = [2048, 1024, 512, 256, 128, 64, 32],
+                                                            w_sc = 1.0,
+                                                            w_log_mag = 1.0,
+                                                            w_lin_mag = 0.0,
+                                                            w_phs = 0.33
+                                                            )
+
+    def forward(self, inputs, targets):
+        mse_loss = self.mse_loss(inputs, targets)
+        sdstft_loss = self.sdstft(inputs, targets)
+        loss = mse_loss + sdstft_loss
+        return (loss, mse_loss, sdstft_loss)
+
+
 class JBDiffusion(pl.LightningModule):
     '''
     JBDiffusion class to be trained
@@ -271,7 +294,8 @@ class JBDiffusion(pl.LightningModule):
         super().__init__()
 
         self.level = level
-        self.diffusion = DiffusionModel(**diffusion_kwargs)
+        self.loss_fn = CombinedLoss(sample_rate=44100)
+        self.diffusion = DiffusionModel(loss_fn=self.loss_fn, **diffusion_kwargs)
         # self.diffusion_ema = deepcopy(self.diffusion)
         # self.ema_decay = global_args.ema_decay
         self.vqvae = vqvae
@@ -291,10 +315,12 @@ class JBDiffusion(pl.LightningModule):
         cond_q = rearrange(cond_q, "b c t -> b t c")
         with t.cuda.amp.autocast():
             # Step
-            loss = self.diffusion(x_q, embedding=cond_q, embedding_mask_proba=0.1)
+            loss, mse_loss, sdstft_loss = self.diffusion(x_q, embedding=cond_q, embedding_mask_proba=0.1)
 
         log_dict = {
             'train/loss': loss.detach(),
+            'train/mse_loss': mse_loss.detach(),
+            'train/sdstft_loss': sdstft_loss.detach()
         }
 
         self.log_dict(log_dict, prog_bar=True, on_step=True)
