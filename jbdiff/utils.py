@@ -264,9 +264,9 @@ class CombinedLoss(t.nn.Module):
         self.sample_rate = sample_rate
         self.mse_loss = t.nn.functional.mse_loss
         self.sdstft = auraloss.freq.MultiResolutionSTFTLoss(sample_rate=self.sample_rate, 
-                                                            fft_sizes = [2048, 1024, 512, 256, 128, 64, 32],
-                                                            hop_sizes = [512, 256, 128, 64, 32, 16, 8],
-                                                            win_lengths = [2048, 1024, 512, 256, 128, 64, 32],
+                                                            fft_sizes = [256, 128, 64, 32, 16],
+                                                            hop_sizes = [64, 32, 16, 8, 4],
+                                                            win_lengths = [256, 128, 64, 32, 16],
                                                             w_sc = 1.0,
                                                             w_log_mag = 1.0,
                                                             w_lin_mag = 0.0,
