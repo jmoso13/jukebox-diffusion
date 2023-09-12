@@ -258,7 +258,7 @@ def ema_update(model, averaged_model, decay):
         averaged_buffers[name].copy_(buf)
 
 
-class CombinedLoss(nn.Module):
+class CombinedLoss(t.nn.Module):
     def __init__(self, sample_rate):
         super(CombinedLoss, self).__init__()
         self.sample_rate = sample_rate
