@@ -267,10 +267,11 @@ class CombinedLoss(t.nn.Module):
                                                             fft_sizes = [256, 128, 64, 32, 16],
                                                             hop_sizes = [64, 32, 16, 8, 4],
                                                             win_lengths = [256, 128, 64, 32, 16],
-                                                            w_sc = 1.0,
-                                                            w_log_mag = 1.0,
-                                                            w_lin_mag = 0.0,
-                                                            w_phs = 0.33
+                                                            w_sc = 0.0,
+                                                            w_log_mag = 0.0,
+                                                            w_lin_mag = 1.0,
+                                                            w_phs = 0.0,
+                                                            mag_distance='L2'
                                                             )
 
     def forward(self, inputs, targets):
