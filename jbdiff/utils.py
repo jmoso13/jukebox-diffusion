@@ -276,7 +276,7 @@ class CombinedLoss(t.nn.Module):
     def forward(self, inputs, targets):
         mse_loss = self.mse_loss(inputs, targets)
         sdstft_loss = self.sdstft(inputs, targets)
-        loss = mse_loss + sdstft_loss
+        loss = 0.1*mse_loss + 0.9*sdstft_loss
         return (loss, mse_loss, sdstft_loss)
 
 
