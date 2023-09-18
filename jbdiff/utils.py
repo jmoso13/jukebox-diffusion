@@ -295,8 +295,8 @@ class JBDiffusion(pl.LightningModule):
         super().__init__()
 
         self.level = level
-        self.loss_fn = CombinedLoss(sample_rate=44100)
-        self.diffusion = DiffusionModel(loss_fn=self.loss_fn, **diffusion_kwargs)
+        # self.loss_fn = CombinedLoss(sample_rate=44100)
+        self.diffusion = DiffusionModel(**diffusion_kwargs)
         # self.diffusion_ema = deepcopy(self.diffusion)
         # self.ema_decay = global_args.ema_decay
         self.vqvae = vqvae
