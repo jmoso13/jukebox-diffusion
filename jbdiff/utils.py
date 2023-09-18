@@ -316,12 +316,12 @@ class JBDiffusion(pl.LightningModule):
         cond_q = rearrange(cond_q, "b c t -> b t c")
         with t.cuda.amp.autocast():
             # Step
-            loss, mse_loss, sdstft_loss = self.diffusion(x_q, embedding=cond_q, embedding_mask_proba=0.1)
+            loss = self.diffusion(x_q, embedding=cond_q, embedding_mask_proba=0.1)
 
         log_dict = {
             'train/loss': loss.detach(),
-            'train/mse_loss': mse_loss.detach(),
-            'train/sdstft_loss': sdstft_loss.detach()
+            # 'train/mse_loss': mse_loss.detach(),
+            # 'train/sdstft_loss': sdstft_loss.detach()
         }
 
         self.log_dict(log_dict, prog_bar=True, on_step=True)
