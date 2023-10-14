@@ -1,6 +1,6 @@
 import torch
 from jbdiff.utils import batch_preprocess
-from pandas import pd
+import pandas as pd
 
 def create_data_reference_table(vqvae, dataloader, level, method='xq_mean'):
   vqvae.eval()
