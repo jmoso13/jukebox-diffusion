@@ -140,7 +140,7 @@ class FilesAudioDataset(Dataset):
             labels = self.labeller.get_label(artist, genre, lyrics, total_length, offset)
             return data.T, labels['y']
         else:
-            return data.T, context.T
+            return data.T, filename # THIS BREAKS TRAINING AND SAMPLING, ONLY TO USE FOR EXPLORING SAMPLE ATTRIBUTION
 
     def get_item(self, item, test=False):
         index, offset, context_offset = self.get_index_offset(item)
