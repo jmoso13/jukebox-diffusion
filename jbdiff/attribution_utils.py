@@ -1,5 +1,5 @@
 import torch
-from utils import batch_preprocess
+from jbdiff.utils import batch_preprocess
 from pandas import pd
 
 def create_data_reference_table(vqvae, dataloader, level, method='xq_mean'):
