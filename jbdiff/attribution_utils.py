@@ -29,6 +29,20 @@ def create_data_reference_table(vqvae, dataloader, level, method='zq_count'):
         batch_counts[i,unique] = counts
       fns += list(fn)
       final.append(batch_counts)
+    elif method == 'both':
+      final = dict(xq_mean=list(), zq_count=list())
+      fns += list(fn)
+      # xq_mean
+      batch_means = torch.mean(torch.abs(x_q), dim=-1)
+      final['xq_mean'].append(batch_means.to('cpu').numpy())
+      # zq_count
+      b = z_q.shape[0]
+      z_q = z_q.to('cpu').numpy()
+      batch_counts = np.zeros((b, 2048))
+      for i, z in enumerate(z_q):
+        unique, counts = np.unique(z, return_counts=True)
+        batch_counts[i,unique] = counts
+      final['zq_count'].append(batch_counts)
     else:
       raise Exception('Unknown method')
 
