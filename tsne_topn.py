@@ -42,8 +42,8 @@ for i in range(times):
     fn_dict[meth] += fns
 
 for meth in meths:
-  data_ref[meth] = np.array(data_ref[meth])
-  data_ref[meth] = rearrange(data_ref[meth], "n b s -> (n b) s")
+  data_refs[meth] = np.array(data_refs[meth])
+  data_refs[meth] = rearrange(data_refs[meth], "n b s -> (n b) s")
 
 loss_dict['xq_mean'] = MSELoss()
 loss_dict['zq_count'] = L1Loss()

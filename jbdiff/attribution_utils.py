@@ -9,7 +9,10 @@ def create_data_reference_table(vqvae, dataloader, level, method='zq_count'):
   vqvae.eval()
   assert not vqvae.training
   fns = list()
-  final = list()
+  if method != 'both':
+    final = list()
+  else:
+    final = dict(xq_mean=list(), zq_count=list())
 
   for batch in tqdm(dataloader):
     x, fn = batch
@@ -30,7 +33,6 @@ def create_data_reference_table(vqvae, dataloader, level, method='zq_count'):
       fns += list(fn)
       final.append(batch_counts)
     elif method == 'both':
-      final = dict(xq_mean=list(), zq_count=list())
       fns += list(fn)
       # xq_mean
       batch_means = torch.mean(torch.abs(x_q), dim=-1)
