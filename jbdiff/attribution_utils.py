@@ -5,7 +5,6 @@ import numpy as np
 from tqdm import tqdm
 
 
-
 def create_data_reference_table(vqvae, dataloader, level, method='zq_count'):
   vqvae.eval()
   assert not vqvae.training
@@ -33,7 +32,7 @@ def create_data_reference_table(vqvae, dataloader, level, method='zq_count'):
     else:
       raise Exception('Unknown method')
 
-    return final, fns
+  return final, fns
 
 
 def create_sample_reference(vqvae, audio, level, method='zq_count'):
