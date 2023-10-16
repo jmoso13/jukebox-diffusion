@@ -3,6 +3,7 @@ from jbdiff.utils import batch_preprocess
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+from jukebox.utils.io import get_duration_sec, load_audio
 
 
 def create_data_reference_table(vqvae, dataloader, level, method='zq_count'):
@@ -51,13 +52,11 @@ def create_data_reference_table(vqvae, dataloader, level, method='zq_count'):
   return final, fns
 
 
-def create_sample_reference(vqvae, audio, level, method='zq_count'):
+def create_sample_reference(vqvae, audio_tensor, level, method='zq_count'):
   vqvae.eval()
   assert not vqvae.training
 
-  x = torch.tensor(x, device='cuda')
-  x = x.unsqueeze(0)
-  z_q, x_q = batch_preprocess(x, vqvae, level)
+  z_q, x_q = batch_preprocess(audio_tensor, vqvae, level)
 
   if method == 'xq_mean':
     sample_mean = torch.mean(torch.abs(x_q), dim=-1)
@@ -67,8 +66,9 @@ def create_sample_reference(vqvae, audio, level, method='zq_count'):
     b = z_q.shape[0]
     z_q = z_q.to('cpu').numpy()
     batch_counts = np.zeros((b, 2048))
-    unique, counts = np.unique(z_q, return_counts=True)
-    batch_counts[:,unique] = counts
+    for i, z in enumerate(z_q):
+      unique, counts = np.unique(z, return_counts=True)
+      batch_counts[i,unique] = counts
     final = batch_counts
   else:
     raise Exception('Unknown method')
@@ -105,3 +105,15 @@ def get_top_n_similarities(sample_ref, data_ref, fns, loss_fn, top_n=100):
   for f in final:
     fns_list.append(fns[f])
   return final, fns_list
+
+
+def load_sample_ntimes(fn, samples, sr, n, device='cuda'):
+  duration = get_duration_sec(fn)
+  sample_length = int(duration*sr)
+  sample_area = sample_length - samples
+  sample_array = np.zeros((n, samples, 2))
+  for i in range(n):
+    offset = np.random.choice(sample_area)
+    sample_array[i, :, :] = load_audio(fn, sr=sr, offset=offset, duration=samples)[0].T
+  return torch.tensor(sample_array, device=device)
+
